@@ -3,12 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
+import sirv from 'sirv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_FILE = path.join(__dirname, 'data', 'quizzes.json');
+const DIST_DIR = path.join(__dirname, '..', 'dist');
 
-const PORT = Number(process.env.WS_PORT || process.env.PORT || 3001);
+const PORT = Number(process.env.PORT || process.env.WS_PORT || 3001);
+
+// Static file handler for Astro production build
+const staticHandler = fs.existsSync(DIST_DIR) 
+  ? sirv(DIST_DIR, { dev: process.env.NODE_ENV !== 'production', single: true, etag: true })
+  : null;
 
 // Helper to read quizzes from disk
 function loadQuizzes() {
@@ -124,7 +131,13 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Default fallback
+  // Static file serving fallback for production (Render / single-server)
+  if (staticHandler) {
+    staticHandler(req, res);
+    return;
+  }
+
+  // Default fallback if dist/ not built
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ status: 'ok', server: 'AstroQuiz WS & HTTP API' }));
 });
@@ -542,6 +555,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`[WS-SERVER] Quiz Server (HTTP API & WebSocket) running on port ${PORT}`);
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`[WS-SERVER] Quiz Server (HTTP, WebSocket & Static) running on port ${PORT}`);
 });

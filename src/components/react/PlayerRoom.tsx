@@ -64,7 +64,14 @@ export default function PlayerRoom() {
 
   // Connect to WS
   useEffect(() => {
-    const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || `ws://${window.location.hostname}:3001`;
+    const isDevPort = typeof window !== 'undefined' && window.location.port === '4321';
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || (
+      isDevPort 
+        ? `ws://${window.location.hostname}:3001` 
+        : `${wsProtocol}//${window.location.host}`
+    );
+
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

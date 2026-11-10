@@ -41,7 +41,10 @@ export default function QuizManager() {
 
   const getApiUrl = () => {
     if (typeof window !== 'undefined') {
-      return `http://${window.location.hostname}:3001/api/quizzes`;
+      if (window.location.port === '4321') {
+        return `http://${window.location.hostname}:3001/api/quizzes`;
+      }
+      return '/api/quizzes';
     }
     return 'http://localhost:3001/api/quizzes';
   };

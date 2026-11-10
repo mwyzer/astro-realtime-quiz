@@ -51,7 +51,9 @@ export default function HostRoom() {
   // Connect to WS server & load quizzes
   useEffect(() => {
     // 1. Fetch latest quizzes from REST API
-    const apiUrl = `http://${window.location.hostname}:3001/api/quizzes`;
+    const isDevPort = typeof window !== 'undefined' && window.location.port === '4321';
+    const apiUrl = isDevPort ? `http://${window.location.hostname}:3001/api/quizzes` : '/api/quizzes';
+
     fetch(apiUrl)
       .then(res => res.json())
       .then(data => {
@@ -67,7 +69,13 @@ export default function HostRoom() {
       .catch(() => {});
 
     // 2. Connect WebSocket
-    const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || `ws://${window.location.hostname}:3001`;
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || (
+      isDevPort 
+        ? `ws://${window.location.hostname}:3001` 
+        : `${wsProtocol}//${window.location.host}`
+    );
+
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
