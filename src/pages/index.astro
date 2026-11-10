@@ -1,0 +1,138 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { DEFAULT_QUIZZES } from '../data/default-quizzes';
+---
+
+<Layout title="Beranda | Platform Kuis Real-time Cepat">
+  {/* Hero Section */}
+  <section class="relative overflow-hidden py-16 sm:py-24 border-b border-slate-900">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.25),rgba(255,255,255,0))]" />
+    
+    <div class="relative max-w-5xl mx-auto px-4 text-center">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-bold tracking-wide uppercase mb-6 backdrop-blur-sm">
+        <span>⚡ Astro Islands Architecture + WebSocket</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight sm:leading-tight mb-6">
+        Kuis Interaktif <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-amber-300">Multiplayer Real-time</span>
+      </h1>
+
+      <p class="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-normal">
+        Uji ketangkasan dan pengetahuan bersama teman atau tim secara langsung. Nikmati kecepatan loading instan dari <strong>Astro</strong> dengan ketangguhan <strong>React</strong> untuk sinkronisasi live socket.
+      </p>
+
+      {/* Dual CTA */}
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-14">
+        <a 
+          href="/host" 
+          class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-extrabold text-base shadow-xl shadow-purple-600/25 flex items-center justify-center gap-2.5 transition-all transform hover:-translate-y-0.5"
+        >
+          <span>🎯 Buka Room (Host)</span>
+        </a>
+
+        <a 
+          href="/play" 
+          class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-white font-extrabold text-base flex items-center justify-center gap-2.5 transition-all transform hover:-translate-y-0.5"
+        >
+          <span>📱 Masuk Kuis (PIN)</span>
+        </a>
+      </div>
+
+      {/* Live Interactive Preview Stats */}
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto text-left">
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
+          <p class="text-2xl font-black text-purple-400 font-mono">0ms</p>
+          <p class="text-xs text-slate-400 font-semibold mt-1">Zero JS Landing Page</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
+          <p class="text-2xl font-black text-pink-400 font-mono">&lt;50ms</p>
+          <p class="text-xs text-slate-400 font-semibold mt-1">Latensi WebSocket</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
+          <p class="text-2xl font-black text-amber-400 font-mono">100%</p>
+          <p class="text-xs text-slate-400 font-semibold mt-1">Islands Hydration</p>
+        </div>
+        <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-2xl">
+          <p class="text-2xl font-black text-emerald-400 font-mono">Anti-Cheat</p>
+          <p class="text-xs text-slate-400 font-semibold mt-1">Server-side Key</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* How It Works */}
+  <section class="py-16 max-w-5xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-2xl sm:text-3xl font-black text-white">Cara Bermain</h2>
+      <p class="text-slate-400 text-sm mt-2">Tiga langkah mudah untuk memulai sesi kuis seru bersama siapa saja.</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl relative">
+        <div class="w-12 h-12 bg-purple-500/10 text-purple-400 font-mono font-black text-xl rounded-2xl flex items-center justify-center mb-4 border border-purple-500/20">
+          1
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">Host Buka Room</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          Pilih salah satu paket soal di menu Host. Sistem akan menghasilkan PIN 6-digit unik untuk room kuis.
+        </p>
+      </div>
+
+      <div class="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl relative">
+        <div class="w-12 h-12 bg-pink-500/10 text-pink-400 font-mono font-black text-xl rounded-2xl flex items-center justify-center mb-4 border border-pink-500/20">
+          2
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">Peserta Masuk</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          Peserta membuka link <code class="text-pink-300 font-mono">/play</code> di HP atau tab lain, memasukkan PIN, nama, serta memilih avatar kesukaan.
+        </p>
+      </div>
+
+      <div class="bg-slate-900/40 border border-slate-800 p-6 rounded-3xl relative">
+        <div class="w-12 h-12 bg-amber-500/10 text-amber-400 font-mono font-black text-xl rounded-2xl flex items-center justify-center mb-4 border border-amber-500/20">
+          3
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">Adu Kecepatan & Juara</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">
+          Jawab pertanyaan secepat mungkin sebelum waktu habis untuk poin ekstra. Rayakan podium juara di akhir permainan!
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {/* Quick Bank Preview */}
+  <section class="py-12 bg-slate-900/30 border-t border-slate-900">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h2 class="text-2xl font-black text-white">Paket Soal Siap Pakai</h2>
+          <p class="text-slate-400 text-xs mt-1">Daftar bank soal bawaan yang dapat langsung dimainkan.</p>
+        </div>
+        <a href="/bank" class="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1">
+          Lihat Semua Soal →
+        </a>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        {DEFAULT_QUIZZES.map((quiz) => (
+          <div class="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-purple-400">{quiz.category}</span>
+                <span class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">{quiz.questions.length} Soal</span>
+              </div>
+              <h3 class="text-xl font-bold text-white mb-2">{quiz.title}</h3>
+              <p class="text-slate-400 text-sm">{quiz.description}</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span class="text-xs text-slate-500">Waktu per soal: ~15s</span>
+              <a href="/host" class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 px-3 py-1.5 rounded-lg transition-colors">
+                Host Kuis Ini →
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+</Layout>

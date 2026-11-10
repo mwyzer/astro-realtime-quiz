@@ -1,0 +1,11 @@
+---
+import Layout from '../layouts/Layout.astro';
+import QuizManager from '../components/react/QuizManager';
+---
+
+<Layout 
+  title="Bank Soal Kuis | Kelola & Buat Kuis" 
+  description="Kelola bank soal kuis secara interaktif: buat paket baru, edit pertanyaan dan kunci jawaban, serta hapus paket kuis."
+>
+  <QuizManager client:load />
+</Layout>

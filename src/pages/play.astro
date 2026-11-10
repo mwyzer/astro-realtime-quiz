@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PlayerRoom from '../components/react/PlayerRoom';
+---
+
+<Layout 
+  title="Mainkan Kuis | Layar Peserta" 
+  description="Layar Peserta interaktif untuk memasukkan PIN, memilih avatar, dan menjawab pertanyaan kuis secara real-time."
+>
+  <div class="py-6">
+    <PlayerRoom client:load />
+  </div>
+</Layout>

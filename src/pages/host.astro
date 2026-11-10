@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import HostRoom from '../components/react/HostRoom';
+---
+
+<Layout 
+  title="Host Kuis | Layar Utama" 
+  description="Layar Host untuk mengontrol room, melihat peserta live, membagikan pertanyaan kuis, dan menampilkan papan skor juara."
+>
+  <div class="py-6">
+    <HostRoom client:load />
+  </div>
+</Layout>
