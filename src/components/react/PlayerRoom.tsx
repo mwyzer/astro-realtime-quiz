@@ -17,6 +17,14 @@ const OPTION_THEMES = [
   { bg: 'bg-emerald-500', active: 'active:bg-emerald-600', ring: 'ring-emerald-400', shape: '■', label: 'Hijau' },
 ];
 
+interface FloatingReaction {
+  id: string;
+  emoji: string;
+  senderName: string;
+  senderAvatar: string;
+  left: number;
+}
+
 export default function PlayerRoom() {
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -30,6 +38,15 @@ export default function PlayerRoom() {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [phase, setPhase] = useState<'JOIN' | 'LOBBY' | 'COUNTDOWN' | 'QUESTION' | 'SUBMITTED' | 'RESULT' | 'FINISHED'>('JOIN');
+
+  // Floating reactions
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+
+  // Power-Up Lifelines
+  const [fiftyFiftyLeft, setFiftyFiftyLeft] = useState(true);
+  const [doublePointsLeft, setDoublePointsLeft] = useState(true);
+  const [activeDouble, setActiveDouble] = useState(false);
+  const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
 
   // Question details
   const [questionData, setQuestionData] = useState<{
@@ -123,6 +140,8 @@ export default function PlayerRoom() {
         setPhase('QUESTION');
         setSelectedOption(null);
         setResultData(null);
+        setHiddenOptions([]);
+        setActiveDouble(false);
         setQuestionData({
           text: msg.question.text,
           options: msg.question.options,
@@ -133,6 +152,35 @@ export default function PlayerRoom() {
         setTimeLeft(msg.question.timeLimit || 15);
         sound.playPop();
         break;
+
+      case 'FIFTY_FIFTY_RESULT':
+        setHiddenOptions(msg.hiddenIndices || []);
+        setFiftyFiftyLeft(false);
+        sound.playPop();
+        break;
+
+      case 'DOUBLE_POINTS_ACTIVE':
+        setActiveDouble(true);
+        setDoublePointsLeft(false);
+        sound.playPop();
+        break;
+
+      case 'EMOJI_REACTION': {
+        const reactionId = msg.id || ('rx_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now());
+        const newReaction: FloatingReaction = {
+          id: reactionId,
+          emoji: msg.emoji,
+          senderName: msg.senderName,
+          senderAvatar: msg.senderAvatar,
+          left: Math.floor(Math.random() * 80) + 10,
+        };
+        setFloatingReactions(prev => [...prev.slice(-24), newReaction]);
+        sound.playPop();
+        setTimeout(() => {
+          setFloatingReactions(prev => prev.filter(r => r.id !== reactionId));
+        }, 3500);
+        break;
+      }
 
       case 'TIME_TICK':
         setTimeLeft(msg.timeLeft);
@@ -185,6 +233,10 @@ export default function PlayerRoom() {
         setPhase('LOBBY');
         setSelectedOption(null);
         setResultData(null);
+        setFiftyFiftyLeft(true);
+        setDoublePointsLeft(true);
+        setActiveDouble(false);
+        setHiddenOptions([]);
         break;
 
       case 'HOST_DISCONNECTED':
@@ -236,6 +288,71 @@ export default function PlayerRoom() {
       }));
       sound.playPop();
     }
+  };
+
+  const useFiftyFifty = () => {
+    if (!fiftyFiftyLeft || phase !== 'QUESTION' || hiddenOptions.length > 0) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+      wsRef.current.send(JSON.stringify({
+        type: 'USE_FIFTY_FIFTY'
+      }));
+    }
+  };
+
+  const useDoublePoints = () => {
+    if (!doublePointsLeft || phase !== 'QUESTION' || activeDouble) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+      wsRef.current.send(JSON.stringify({
+        type: 'USE_DOUBLE_POINTS'
+      }));
+    }
+  };
+
+  const renderFloatingReactions = () => {
+    return (
+      <>
+        <style>{`
+          @keyframes floatUpReaction {
+            0% {
+              opacity: 0;
+              transform: translateY(100vh) scale(0.6);
+            }
+            12% {
+              opacity: 1;
+              transform: translateY(80vh) scale(1.15);
+            }
+            80% {
+              opacity: 0.95;
+              transform: translateY(15vh) scale(1);
+            }
+            100% {
+              opacity: 0;
+              transform: translateY(-8vh) scale(0.8);
+            }
+          }
+        `}</style>
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {floatingReactions.map((r) => (
+            <div
+              key={r.id}
+              className="absolute flex flex-col items-center select-none"
+              style={{
+                left: `${r.left}%`,
+                bottom: 0,
+                animation: 'floatUpReaction 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards',
+              }}
+            >
+              <span className="text-4xl md:text-5xl filter drop-shadow-lg">
+                {r.emoji}
+              </span>
+              <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900/80 text-white border border-white/20 shadow-lg backdrop-blur whitespace-nowrap">
+                {r.senderAvatar} {r.senderName}
+              </span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
   };
 
   const renderReactionDock = () => {
@@ -360,6 +477,7 @@ export default function PlayerRoom() {
   if (phase === 'LOBBY') {
     return (
       <>
+        {renderFloatingReactions()}
         <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
           <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
             <div className="text-6xl mb-4 animate-bounce">{avatar}</div>
@@ -381,65 +499,124 @@ export default function PlayerRoom() {
   // 3. Countdown Phase
   if (phase === 'COUNTDOWN') {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
-        <span className="text-purple-300 text-xs uppercase tracking-widest font-bold mb-2">Bersiaplah</span>
-        <h2 className="text-3xl font-extrabold text-white mb-6">Pertanyaan Segera Tiba!</h2>
-        <div className="w-24 h-24 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-5xl font-black text-white animate-ping">
-          🚀
+      <>
+        {renderFloatingReactions()}
+        <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
+          <span className="text-purple-300 text-xs uppercase tracking-widest font-bold mb-2">Bersiaplah</span>
+          <h2 className="text-3xl font-extrabold text-white mb-6">Pertanyaan Segera Tiba!</h2>
+          <div className="w-24 h-24 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-5xl font-black text-white animate-ping">
+            🚀
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // 4. Question Phase (Answering Screen)
   if (phase === 'QUESTION' && questionData) {
     return (
-      <div className="max-w-lg mx-auto py-4 px-4 flex flex-col min-h-[80vh] justify-between">
-        {/* Top bar info */}
-        <div>
-          <div className="flex items-center justify-between mb-3 text-xs text-gray-300">
-            <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-              Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
-            </span>
-            <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
-              timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
-            }`}>
-              <Clock className="w-4 h-4" /> {timeLeft}s
-            </span>
+      <>
+        {renderFloatingReactions()}
+        <div className="max-w-lg mx-auto py-4 px-4 pb-24 flex flex-col min-h-[85vh] justify-between">
+          {/* Top bar info */}
+          <div>
+            <div className="flex items-center justify-between mb-3 text-xs text-gray-300">
+              <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
+              </span>
+              <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
+                timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
+              }`}>
+                <Clock className="w-4 h-4" /> {timeLeft}s
+              </span>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl mb-4 text-center">
+              <p className="text-lg font-bold text-white leading-snug">
+                {questionData.text}
+              </p>
+            </div>
+
+            {/* Power-Up Lifelines Bar */}
+            <div className="bg-slate-900/80 border border-purple-500/30 p-3 rounded-2xl mb-4 backdrop-blur shadow-lg">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-400" /> Power-Up Lifelines
+                </span>
+                {activeDouble && (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                    🔥 2x Poin Aktif!
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={useFiftyFifty}
+                  disabled={!fiftyFiftyLeft || hiddenOptions.length > 0 || selectedOption !== null}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    fiftyFiftyLeft && hiddenOptions.length === 0 && selectedOption === null
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
+                      : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  <span>✂️ 50:50</span>
+                  <span className="text-[10px] opacity-80">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={useDoublePoints}
+                  disabled={!doublePointsLeft || activeDouble || selectedOption !== null}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    doublePointsLeft && !activeDouble && selectedOption === null
+                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
+                      : activeDouble
+                      ? 'bg-amber-500 text-black border-amber-300 font-extrabold animate-pulse'
+                      : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  <span>🚀 2x Poin</span>
+                  <span className="text-[10px] opacity-80">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl mb-6 text-center">
-            <p className="text-lg font-bold text-white leading-snug">
-              {questionData.text}
-            </p>
+          {/* 4 Big Touch Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
+            {questionData.options.map((opt, idx) => {
+              const theme = OPTION_THEMES[idx];
+              const isHidden = hiddenOptions.includes(idx);
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => submitAnswer(idx)}
+                  disabled={isHidden || selectedOption !== null}
+                  className={`w-full py-6 px-4 rounded-2xl font-bold text-white shadow-xl flex items-center gap-3.5 transition-all transform ${
+                    isHidden
+                      ? 'opacity-20 pointer-events-none line-through grayscale cursor-not-allowed scale-95 bg-slate-800 border border-slate-700'
+                      : `active:scale-95 cursor-pointer ${theme.bg} ${theme.active}`
+                  }`}
+                >
+                  <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl font-mono shrink-0">
+                    {theme.shape}
+                  </span>
+                  <span className="text-left text-base sm:text-lg leading-tight font-semibold flex-1">
+                    {opt}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
 
-        {/* 4 Big Touch Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
-          {questionData.options.map((opt, idx) => {
-            const theme = OPTION_THEMES[idx];
-            return (
-              <button
-                key={idx}
-                onClick={() => submitAnswer(idx)}
-                className={`w-full py-6 px-4 rounded-2xl font-bold text-white shadow-xl flex items-center gap-3.5 transition-all transform active:scale-95 ${theme.bg} ${theme.active}`}
-              >
-                <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl font-mono shrink-0">
-                  {theme.shape}
-                </span>
-                <span className="text-left text-base sm:text-lg leading-tight font-semibold flex-1">
-                  {opt}
-                </span>
-              </button>
-            );
-          })}
+          <p className="text-center text-xs text-gray-500 mt-3 mb-2">
+            Pilih salah satu jawaban secepat mungkin untuk poin lebih tinggi!
+          </p>
         </div>
-
-        <p className="text-center text-xs text-gray-500 mt-4">
-          Pilih salah satu jawaban secepat mungkin untuk poin lebih tinggi!
-        </p>
-      </div>
+        {renderReactionDock()}
+      </>
     );
   }
 
@@ -449,6 +626,7 @@ export default function PlayerRoom() {
 
     return (
       <>
+        {renderFloatingReactions()}
         <div className="max-w-md mx-auto py-16 px-4 pb-24 text-center">
           <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
             <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -474,6 +652,7 @@ export default function PlayerRoom() {
   if (phase === 'RESULT' && resultData) {
     return (
       <>
+        {renderFloatingReactions()}
         <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
           <div className={`rounded-3xl p-8 backdrop-blur shadow-2xl border ${
             resultData.isCorrect 
@@ -525,6 +704,7 @@ export default function PlayerRoom() {
   if (phase === 'FINISHED' && finalRank) {
     return (
       <>
+        {renderFloatingReactions()}
         <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
           <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
             <Award className="w-20 h-20 text-yellow-400 mx-auto mb-4 animate-bounce" />

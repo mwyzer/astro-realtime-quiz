@@ -16,6 +16,8 @@ const OPTION_THEMES = [
   { bg: 'bg-emerald-500', hover: 'hover:bg-emerald-600', ring: 'ring-emerald-400', shape: '■', label: 'Hijau' },
 ];
 
+const REACTION_EMOJIS = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
+
 interface FloatingReaction {
   id: string;
   emoji: string;
@@ -54,6 +56,7 @@ export default function HostRoom() {
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const [powerupToast, setPowerupToast] = useState<{ text: string; id: number } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -206,6 +209,18 @@ export default function HostRoom() {
         break;
       }
 
+      case 'POWERUP_USED': {
+        setPowerupToast({
+          text: `⚡ ${msg.playerAvatar} ${msg.playerName} menggunakan ${msg.powerupName}!`,
+          id: Date.now()
+        });
+        sound.playPop();
+        setTimeout(() => {
+          setPowerupToast(null);
+        }, 3500);
+        break;
+      }
+
       case 'ERROR':
         setErrorMsg(msg.message);
         break;
@@ -291,6 +306,48 @@ export default function HostRoom() {
     );
   };
 
+  const sendReaction = (emoji: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(JSON.stringify({
+        type: 'SEND_REACTION',
+        emoji
+      }));
+      sound.playPop();
+    }
+  };
+
+  const renderReactionDock = () => {
+    return (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-purple-500/40 backdrop-blur-md px-3 py-2 rounded-2xl shadow-2xl flex items-center gap-1 sm:gap-2">
+        <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider px-2 hidden sm:inline">
+          Host Reaction:
+        </span>
+        {REACTION_EMOJIS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => sendReaction(emoji)}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/80 hover:bg-purple-600/30 active:scale-90 transition-all flex items-center justify-center text-xl sm:text-2xl border border-white/10 hover:border-purple-400/50 shadow-sm cursor-pointer"
+            title={`Kirim ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPowerupToast = () => {
+    if (!powerupToast) return null;
+    return (
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
+        <div className="bg-gradient-to-r from-amber-500 to-purple-600 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+          <span>{powerupToast.text}</span>
+        </div>
+      </div>
+    );
+  };
+
   // 1. Connection Error
   if (!wsConnected && errorMsg) {
     return (
@@ -323,6 +380,33 @@ export default function HostRoom() {
           </div>
           <h2 className="text-3xl font-extrabold text-white">Pilih Paket Kuis</h2>
           <p className="text-gray-400 text-sm mt-2">Pilih paket soal yang ingin kamu sajikan untuk para peserta di layar ini.</p>
+        </div>
+
+        {/* Highlighted Live Features Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-8">
+          <div className="bg-gradient-to-br from-pink-500/15 to-purple-500/10 border border-pink-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
+            <span className="text-3xl">🎭</span>
+            <div>
+              <h4 className="text-sm font-bold text-white">Live Floating Reactions</h4>
+              <p className="text-xs text-pink-200/80">Kirim emoji ❤️🔥🚀 melayang realtime di layar bersama</p>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-500/15 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
+            <span className="text-3xl">⚡</span>
+            <div>
+              <h4 className="text-sm font-bold text-white">Power-Up Lifelines</h4>
+              <p className="text-xs text-amber-200/80">Bantuan 50:50 potong 2 opsi & 2x Points Boost pembalik skor</p>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-cyan-500/15 to-blue-500/10 border border-cyan-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
+            <span className="text-3xl">📱</span>
+            <div>
+              <h4 className="text-sm font-bold text-white">QR Code & Live Board</h4>
+              <p className="text-xs text-cyan-200/80">Scan QR / 1-Klik join instan + klasemen live antar-soal</p>
+            </div>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -359,12 +443,15 @@ export default function HostRoom() {
 
   // 3. Lobby Phase
   if (phase === 'LOBBY') {
+    const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/play?pin=${roomCode}` : `/play?pin=${roomCode}`;
+
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-5xl mx-auto py-6 px-4">
-          {/* Top Header Card with PIN */}
-          <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl mb-8 text-center relative overflow-hidden">
+        {renderPowerupToast()}
+        <div className="max-w-5xl mx-auto py-6 px-4 pb-24">
+          {/* Top Header Card with PIN & QR Code */}
+          <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl mb-8 relative overflow-hidden">
             <div className="absolute top-4 right-4 flex items-center gap-2">
               <button 
                 onClick={() => setSoundEnabled(!soundEnabled)}
@@ -375,30 +462,58 @@ export default function HostRoom() {
               </button>
             </div>
 
-            <p className="text-purple-300 text-xs font-semibold tracking-wider uppercase mb-2">
-              Masuk ke halaman <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded">/play</span> dan masukkan PIN:
-            </p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              {/* Left Column: PIN & Info */}
+              <div className="flex-1 text-center md:text-left">
+                <p className="text-purple-300 text-xs font-semibold tracking-wider uppercase mb-1">
+                  Buka di Browser: <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded">/play</span> atau scan QR
+                </p>
 
-            <div className="inline-flex items-center gap-4 my-2">
-              <span className="text-6xl md:text-7xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 font-mono drop-shadow-md">
-                {roomCode}
-              </span>
-              <button
-                onClick={copyPin}
-                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
-                title="Salin PIN"
-              >
-                {copied ? <Check className="w-6 h-6 text-green-400" /> : <Copy className="w-6 h-6" />}
-              </button>
-            </div>
+                <div className="inline-flex items-center gap-4 my-2">
+                  <span className="text-5xl sm:text-6xl md:text-7xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 font-mono drop-shadow-md">
+                    {roomCode}
+                  </span>
+                  <button
+                    onClick={copyPin}
+                    className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
+                    title="Salin PIN"
+                  >
+                    {copied ? <Check className="w-6 h-6 text-green-400" /> : <Copy className="w-6 h-6" />}
+                  </button>
+                </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-300">
-              <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-                📖 Kuis: <strong className="text-white">{quizMeta.title}</strong>
-              </span>
-              <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-                ❓ Total: <strong className="text-white">{quizMeta.count} Pertanyaan</strong>
-              </span>
+                <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs text-gray-300">
+                  <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
+                    📖 Kuis: <strong className="text-white">{quizMeta.title}</strong>
+                  </span>
+                  <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
+                    ❓ Total: <strong className="text-white">{quizMeta.count} Soal</strong>
+                  </span>
+                </div>
+
+                <div className="mt-4">
+                  <a
+                    href={`/play?pin=${roomCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 shadow-lg shadow-purple-600/30 transition-all hover:scale-105"
+                  >
+                    <span>🔗 Buka Tab Pemain (Auto-PIN)</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Right Column: Dynamic QR Code */}
+              <div className="bg-white/10 border border-white/20 p-4 rounded-2xl flex flex-col items-center shadow-inner shrink-0 backdrop-blur">
+                <div className="bg-white p-2 rounded-xl shadow-md">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(joinUrl)}`}
+                    alt="QR Code Masuk Kuis"
+                    className="w-28 h-28 sm:w-32 sm:h-32 rounded"
+                  />
+                </div>
+                <span className="text-[11px] font-bold text-purple-200 mt-2">📱 Scan QR untuk Join</span>
+              </div>
             </div>
           </div>
 
@@ -452,6 +567,7 @@ export default function HostRoom() {
             )}
           </div>
         </div>
+        {renderReactionDock()}
       </>
     );
   }
@@ -480,7 +596,8 @@ export default function HostRoom() {
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-5xl mx-auto py-4 px-4">
+        {renderPowerupToast()}
+        <div className="max-w-5xl mx-auto py-4 px-4 pb-24">
           {/* Top bar with Question tracker, Timer, and Answer Count */}
           <div className="flex items-center justify-between mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
             <div className="flex items-center gap-3">
@@ -565,12 +682,56 @@ export default function HostRoom() {
             })}
           </div>
 
+          {/* Inter-Question Live Leaderboard */}
+          {isReview && players.length > 0 && (
+            <div className="bg-slate-900/80 border border-purple-500/30 rounded-2xl p-5 mb-6 backdrop-blur shadow-xl">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
+                <Trophy className="w-5 h-5 text-yellow-400" />
+                <h3 className="font-extrabold text-white text-base">🏆 Klasemen Sementara (Live Leaderboard)</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                {players.slice(0, 6).map((p, idx) => (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border ${
+                      idx === 0 
+                        ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200' 
+                        : idx === 1 
+                        ? 'bg-slate-800/90 border-slate-600 text-slate-200' 
+                        : idx === 2 
+                        ? 'bg-amber-800/20 border-amber-600/40 text-amber-200' 
+                        : 'bg-slate-800/50 border-slate-700/60 text-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span className="font-mono font-black text-sm w-5 text-center">
+                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                      </span>
+                      <span className="text-xl">{p.avatar}</span>
+                      <div className="truncate">
+                        <span className="font-bold text-white text-sm truncate block">{p.name}</span>
+                        {p.streak > 1 && (
+                          <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5">
+                            🔥 {p.streak}x streak
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-mono font-black text-sm text-purple-300 ml-2 shrink-0">
+                      {p.score} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Review Action Footer */}
           {isReview && (
             <div className="flex justify-end mt-4">
               <button
                 onClick={nextQuestion}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base cursor-pointer"
               >
                 <span>{currentQuestion.questionIndex + 1 >= currentQuestion.totalQuestions ? 'Lihat Papan Skor Akhir' : 'Soal Berikutnya'}</span>
                 <ArrowRight className="w-5 h-5" />
@@ -578,6 +739,7 @@ export default function HostRoom() {
             </div>
           )}
         </div>
+        {renderReactionDock()}
       </>
     );
   }
@@ -590,7 +752,8 @@ export default function HostRoom() {
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-4xl mx-auto py-8 px-4 text-center">
+        {renderPowerupToast()}
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-24 text-center">
           <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 mb-3">
             <Trophy className="w-4 h-4" /> Game Over
           </span>
@@ -657,12 +820,13 @@ export default function HostRoom() {
 
           <button
             onClick={restartGame}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl transition-all inline-flex items-center gap-2"
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl transition-all inline-flex items-center gap-2 cursor-pointer"
           >
             <RotateCcw className="w-5 h-5" />
             <span>Main Lagi di Room Ini</span>
           </button>
         </div>
+        {renderReactionDock()}
       </>
     );
   }

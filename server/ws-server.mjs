@@ -227,6 +227,9 @@ function endCurrentQuestion(room) {
       const timeSpent = Math.min(player.answerTimeMs || timeLimitMs, timeLimitMs);
       const speedRatio = Math.max(0, 1 - (timeSpent / timeLimitMs));
       earned = Math.round(500 + (500 * speedRatio) + (Math.min(player.streak, 5) * 50));
+      if (player.activeDoublePoints) {
+        earned = earned * 2;
+      }
       player.score += earned;
     } else {
       player.streak = 0;
@@ -280,6 +283,7 @@ function startQuestion(room, index) {
   for (const p of room.players.values()) {
     p.currentAnswer = null;
     p.answerTimeMs = null;
+    p.activeDoublePoints = false;
   }
 
   safeSend(room.hostWs, {
@@ -409,7 +413,9 @@ wss.on('connection', (ws) => {
             streak: 0,
             currentAnswer: null,
             answerTimeMs: null,
-            lastReactionTime: 0
+            lastReactionTime: 0,
+            powerups: { fiftyFifty: true, doublePoints: true },
+            activeDoublePoints: false
           };
 
           room.players.set(playerId, newPlayer);
@@ -519,6 +525,8 @@ wss.on('connection', (ws) => {
             p.streak = 0;
             p.currentAnswer = null;
             p.answerTimeMs = null;
+            p.powerups = { fiftyFifty: true, doublePoints: true };
+            p.activeDoublePoints = false;
           }
           const players = getPlayerList(room);
           broadcastToRoom(room, {
@@ -529,30 +537,104 @@ wss.on('connection', (ws) => {
         }
 
         case 'SEND_REACTION': {
-          if (!boundRoom || !boundPlayerId) return;
+          if (!boundRoom) return;
           const room = boundRoom;
-          const player = room.players.get(boundPlayerId);
-          if (!player) return;
+
+          let senderName = '';
+          let senderAvatar = '';
+          let lastTime = 0;
+
+          if (isHost) {
+            senderName = 'Host 🎯';
+            senderAvatar = '👑';
+            lastTime = room.lastHostReactionTime || 0;
+          } else {
+            if (!boundPlayerId) return;
+            const player = room.players.get(boundPlayerId);
+            if (!player) return;
+            senderName = player.name;
+            senderAvatar = player.avatar;
+            lastTime = player.lastReactionTime || 0;
+          }
 
           const allowedEmojis = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
           const emoji = data.emoji;
           if (!emoji || !allowedEmojis.includes(emoji)) return;
 
           const now = Date.now();
-          if (now - (player.lastReactionTime || 0) < 200) {
+          if (now - lastTime < 200) {
             return;
           }
-          player.lastReactionTime = now;
+
+          if (isHost) {
+            room.lastHostReactionTime = now;
+          } else {
+            const player = room.players.get(boundPlayerId);
+            if (player) player.lastReactionTime = now;
+          }
 
           const reactionPayload = {
             type: 'EMOJI_REACTION',
             id: 'rx_' + Math.random().toString(36).substring(2, 9) + '_' + now,
             emoji,
-            senderName: player.name,
-            senderAvatar: player.avatar
+            senderName,
+            senderAvatar
           };
 
           broadcastToRoom(boundRoom, reactionPayload);
+          break;
+        }
+
+        case 'USE_FIFTY_FIFTY': {
+          if (!boundRoom || !boundPlayerId) return;
+          const room = boundRoom;
+          if (room.phase !== 'QUESTION') return;
+
+          const player = room.players.get(boundPlayerId);
+          if (!player || !player.powerups || !player.powerups.fiftyFifty) return;
+
+          player.powerups.fiftyFifty = false;
+          const q = room.quiz.questions[room.currentQuestionIndex];
+          const correctIndex = q.correctIndex;
+          const wrongIndices = [0, 1, 2, 3].filter(i => i !== correctIndex);
+          const shuffled = wrongIndices.sort(() => 0.5 - Math.random());
+          const hiddenIndices = shuffled.slice(0, 2);
+
+          safeSend(ws, {
+            type: 'FIFTY_FIFTY_RESULT',
+            hiddenIndices
+          });
+
+          broadcastToRoom(room, {
+            type: 'POWERUP_USED',
+            playerName: player.name,
+            playerAvatar: player.avatar,
+            powerupName: '50:50 ✂️'
+          });
+          break;
+        }
+
+        case 'USE_DOUBLE_POINTS': {
+          if (!boundRoom || !boundPlayerId) return;
+          const room = boundRoom;
+          if (room.phase !== 'QUESTION') return;
+
+          const player = room.players.get(boundPlayerId);
+          if (!player || !player.powerups || !player.powerups.doublePoints) return;
+
+          player.powerups.doublePoints = false;
+          player.activeDoublePoints = true;
+
+          safeSend(ws, {
+            type: 'DOUBLE_POINTS_ACTIVE'
+          });
+
+          broadcastToRoom(room, {
+            type: 'POWERUP_USED',
+            playerName: player.name,
+            playerAvatar: player.avatar,
+            powerupName: '2x Points 🚀'
+          });
           break;
         }
       }
