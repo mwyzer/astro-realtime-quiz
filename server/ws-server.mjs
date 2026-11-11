@@ -408,7 +408,8 @@ wss.on('connection', (ws) => {
             score: 0,
             streak: 0,
             currentAnswer: null,
-            answerTimeMs: null
+            answerTimeMs: null,
+            lastReactionTime: 0
           };
 
           room.players.set(playerId, newPlayer);
@@ -524,6 +525,34 @@ wss.on('connection', (ws) => {
             type: 'GAME_RESET',
             players
           });
+          break;
+        }
+
+        case 'SEND_REACTION': {
+          if (!boundRoom || !boundPlayerId) return;
+          const room = boundRoom;
+          const player = room.players.get(boundPlayerId);
+          if (!player) return;
+
+          const allowedEmojis = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
+          const emoji = data.emoji;
+          if (!emoji || !allowedEmojis.includes(emoji)) return;
+
+          const now = Date.now();
+          if (now - (player.lastReactionTime || 0) < 200) {
+            return;
+          }
+          player.lastReactionTime = now;
+
+          const reactionPayload = {
+            type: 'EMOJI_REACTION',
+            id: 'rx_' + Math.random().toString(36).substring(2, 9) + '_' + now,
+            emoji,
+            senderName: player.name,
+            senderAvatar: player.avatar
+          };
+
+          broadcastToRoom(boundRoom, reactionPayload);
           break;
         }
       }

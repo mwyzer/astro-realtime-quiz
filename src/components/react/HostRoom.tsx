@@ -16,6 +16,14 @@ const OPTION_THEMES = [
   { bg: 'bg-emerald-500', hover: 'hover:bg-emerald-600', ring: 'ring-emerald-400', shape: '■', label: 'Hijau' },
 ];
 
+interface FloatingReaction {
+  id: string;
+  emoji: string;
+  senderName: string;
+  senderAvatar: string;
+  left: number;
+}
+
 export default function HostRoom() {
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -45,6 +53,7 @@ export default function HostRoom() {
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -180,6 +189,23 @@ export default function HostRoom() {
         setCurrentQuestion(null);
         break;
 
+      case 'EMOJI_REACTION': {
+        const reactionId = msg.id || ('rx_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now());
+        const newReaction: FloatingReaction = {
+          id: reactionId,
+          emoji: msg.emoji,
+          senderName: msg.senderName,
+          senderAvatar: msg.senderAvatar,
+          left: Math.floor(Math.random() * 80) + 10,
+        };
+        setFloatingReactions(prev => [...prev.slice(-24), newReaction]);
+        sound.playPop();
+        setTimeout(() => {
+          setFloatingReactions(prev => prev.filter(r => r.id !== reactionId));
+        }, 3500);
+        break;
+      }
+
       case 'ERROR':
         setErrorMsg(msg.message);
         break;
@@ -216,6 +242,53 @@ export default function HostRoom() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const renderFloatingReactions = () => {
+    return (
+      <>
+        <style>{`
+          @keyframes floatUpReaction {
+            0% {
+              opacity: 0;
+              transform: translateY(100vh) scale(0.6);
+            }
+            12% {
+              opacity: 1;
+              transform: translateY(80vh) scale(1.15);
+            }
+            80% {
+              opacity: 0.95;
+              transform: translateY(15vh) scale(1);
+            }
+            100% {
+              opacity: 0;
+              transform: translateY(-8vh) scale(0.8);
+            }
+          }
+        `}</style>
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {floatingReactions.map((r) => (
+            <div
+              key={r.id}
+              className="absolute flex flex-col items-center select-none"
+              style={{
+                left: `${r.left}%`,
+                bottom: 0,
+                animation: 'floatUpReaction 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards',
+              }}
+            >
+              <span className="text-4xl md:text-5xl filter drop-shadow-lg">
+                {r.emoji}
+              </span>
+              <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900/80 text-white border border-white/20 shadow-lg backdrop-blur whitespace-nowrap">
+                {r.senderAvatar} {r.senderName}
+              </span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
   };
 
   // 1. Connection Error
@@ -287,109 +360,115 @@ export default function HostRoom() {
   // 3. Lobby Phase
   if (phase === 'LOBBY') {
     return (
-      <div className="max-w-5xl mx-auto py-6 px-4">
-        {/* Top Header Card with PIN */}
-        <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl mb-8 text-center relative overflow-hidden">
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <button 
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-lg border border-slate-600 text-xs"
-              title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
-            >
-              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-          </div>
-
-          <p className="text-purple-300 text-xs font-semibold tracking-wider uppercase mb-2">
-            Masuk ke halaman <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded">/play</span> dan masukkan PIN:
-          </p>
-
-          <div className="inline-flex items-center gap-4 my-2">
-            <span className="text-6xl md:text-7xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 font-mono drop-shadow-md">
-              {roomCode}
-            </span>
-            <button
-              onClick={copyPin}
-              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
-              title="Salin PIN"
-            >
-              {copied ? <Check className="w-6 h-6 text-green-400" /> : <Copy className="w-6 h-6" />}
-            </button>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-300">
-            <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-              📖 Kuis: <strong className="text-white">{quizMeta.title}</strong>
-            </span>
-            <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-              ❓ Total: <strong className="text-white">{quizMeta.count} Pertanyaan</strong>
-            </span>
-          </div>
-        </div>
-
-        {/* Players Area */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur mb-8">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-500/20 text-purple-300 rounded-xl">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Peserta di Lobby ({players.length})</h3>
-                <p className="text-xs text-gray-400">Menunggu pemain lain bergabung melalui perangkat mereka...</p>
-              </div>
+      <>
+        {renderFloatingReactions()}
+        <div className="max-w-5xl mx-auto py-6 px-4">
+          {/* Top Header Card with PIN */}
+          <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl mb-8 text-center relative overflow-hidden">
+            <div className="absolute top-4 right-4 flex items-center gap-2">
+              <button 
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-lg border border-slate-600 text-xs"
+                title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
             </div>
 
-            <button
-              onClick={startGame}
-              disabled={players.length === 0}
-              className={`px-8 py-3.5 rounded-xl font-bold text-white shadow-xl flex items-center gap-2 transition-all ${
-                players.length > 0 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 cursor-pointer shadow-emerald-500/20'
-                  : 'bg-slate-700/50 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <Play className="w-5 h-5 fill-current" />
-              <span>Mulai Kuis</span>
-            </button>
+            <p className="text-purple-300 text-xs font-semibold tracking-wider uppercase mb-2">
+              Masuk ke halaman <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded">/play</span> dan masukkan PIN:
+            </p>
+
+            <div className="inline-flex items-center gap-4 my-2">
+              <span className="text-6xl md:text-7xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 font-mono drop-shadow-md">
+                {roomCode}
+              </span>
+              <button
+                onClick={copyPin}
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
+                title="Salin PIN"
+              >
+                {copied ? <Check className="w-6 h-6 text-green-400" /> : <Copy className="w-6 h-6" />}
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-300">
+              <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
+                📖 Kuis: <strong className="text-white">{quizMeta.title}</strong>
+              </span>
+              <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
+                ❓ Total: <strong className="text-white">{quizMeta.count} Pertanyaan</strong>
+              </span>
+            </div>
           </div>
 
-          {players.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl">
-              <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <Users className="w-8 h-8 text-gray-500" />
-              </div>
-              <p className="text-gray-400 font-medium text-sm">Belum ada peserta yang bergabung.</p>
-              <p className="text-gray-500 text-xs mt-1">Buka tab baru di browser dan akses <code className="text-purple-400 font-mono">/play</code> untuk mencoba join!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {players.map((p) => (
-                <div 
-                  key={p.id}
-                  className="bg-slate-800/80 border border-purple-500/20 rounded-2xl p-4 text-center transform hover:scale-105 transition-all shadow-md animate-bounce-short"
-                >
-                  <span className="text-4xl block mb-2">{p.avatar}</span>
-                  <p className="font-bold text-white text-sm truncate">{p.name}</p>
+          {/* Players Area */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur mb-8">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-purple-500/20 text-purple-300 rounded-xl">
+                  <Users className="w-6 h-6" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-xl font-bold text-white">Peserta di Lobby ({players.length})</h3>
+                  <p className="text-xs text-gray-400">Menunggu pemain lain bergabung melalui perangkat mereka...</p>
+                </div>
+              </div>
+
+              <button
+                onClick={startGame}
+                disabled={players.length === 0}
+                className={`px-8 py-3.5 rounded-xl font-bold text-white shadow-xl flex items-center gap-2 transition-all ${
+                  players.length > 0 
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 cursor-pointer shadow-emerald-500/20'
+                    : 'bg-slate-700/50 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <Play className="w-5 h-5 fill-current" />
+                <span>Mulai Kuis</span>
+              </button>
             </div>
-          )}
+
+            {players.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl">
+                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <Users className="w-8 h-8 text-gray-500" />
+                </div>
+                <p className="text-gray-400 font-medium text-sm">Belum ada peserta yang bergabung.</p>
+                <p className="text-gray-500 text-xs mt-1">Buka tab baru di browser dan akses <code className="text-purple-400 font-mono">/play</code> untuk mencoba join!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {players.map((p) => (
+                  <div 
+                    key={p.id}
+                    className="bg-slate-800/80 border border-purple-500/20 rounded-2xl p-4 text-center transform hover:scale-105 transition-all shadow-md animate-bounce-short"
+                  >
+                    <span className="text-4xl block mb-2">{p.avatar}</span>
+                    <p className="font-bold text-white text-sm truncate">{p.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // 4. Countdown Phase
   if (phase === 'COUNTDOWN') {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-        <p className="text-purple-300 uppercase tracking-widest text-sm font-bold mb-4">Bersiaplah!</p>
-        <div className="w-40 h-40 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-8xl font-black text-white shadow-2xl shadow-purple-500/40 animate-pulse">
-          {countdownNum}
+      <>
+        {renderFloatingReactions()}
+        <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
+          <p className="text-purple-300 uppercase tracking-widest text-sm font-bold mb-4">Bersiaplah!</p>
+          <div className="w-40 h-40 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-8xl font-black text-white shadow-2xl shadow-purple-500/40 animate-pulse">
+            {countdownNum}
+          </div>
+          <p className="text-gray-400 text-sm mt-6">Kuis akan dimulai dalam hitungan detik...</p>
         </div>
-        <p className="text-gray-400 text-sm mt-6">Kuis akan dimulai dalam hitungan detik...</p>
-      </div>
+      </>
     );
   }
 
@@ -399,104 +478,107 @@ export default function HostRoom() {
     const percentTime = Math.max(0, (timeLeft / (currentQuestion.timeLimit || 15)) * 100);
 
     return (
-      <div className="max-w-5xl mx-auto py-4 px-4">
-        {/* Top bar with Question tracker, Timer, and Answer Count */}
-        <div className="flex items-center justify-between mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
-          <div className="flex items-center gap-3">
-            <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-sm border border-purple-500/30">
-              Soal {currentQuestion.questionIndex + 1} dari {currentQuestion.totalQuestions}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-gray-300">
-                Terjawab: <strong className="text-white font-mono text-base">{answeredCount}</strong> / {players.length}
+      <>
+        {renderFloatingReactions()}
+        <div className="max-w-5xl mx-auto py-4 px-4">
+          {/* Top bar with Question tracker, Timer, and Answer Count */}
+          <div className="flex items-center justify-between mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
+            <div className="flex items-center gap-3">
+              <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-sm border border-purple-500/30">
+                Soal {currentQuestion.questionIndex + 1} dari {currentQuestion.totalQuestions}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Clock className={`w-5 h-5 ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
-              <span className={`text-2xl font-mono font-black ${timeLeft <= 5 ? 'text-red-400' : 'text-white'}`}>
-                {timeLeft}s
-              </span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-gray-400" />
+                <span className="text-sm font-medium text-gray-300">
+                  Terjawab: <strong className="text-white font-mono text-base">{answeredCount}</strong> / {players.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Clock className={`w-5 h-5 ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
+                <span className={`text-2xl font-mono font-black ${timeLeft <= 5 ? 'text-red-400' : 'text-white'}`}>
+                  {timeLeft}s
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Timer progress bar */}
-        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-6">
-          <div 
-            className={`h-full transition-all duration-1000 ${
-              timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-purple-500 to-indigo-400'
-            }`}
-            style={{ width: `${percentTime}%` }}
-          />
-        </div>
+          {/* Timer progress bar */}
+          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-6">
+            <div 
+              className={`h-full transition-all duration-1000 ${
+                timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-purple-500 to-indigo-400'
+              }`}
+              style={{ width: `${percentTime}%` }}
+            />
+          </div>
 
-        {/* Big Question Card */}
-        <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-3xl p-8 mb-6 shadow-2xl text-center">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-relaxed">
-            {currentQuestion.text}
-          </h2>
-          {isReview && currentQuestion.explanation && (
-            <div className="mt-4 p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200 text-left max-w-2xl mx-auto">
-              💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
+          {/* Big Question Card */}
+          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-3xl p-8 mb-6 shadow-2xl text-center">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-relaxed">
+              {currentQuestion.text}
+            </h2>
+            {isReview && currentQuestion.explanation && (
+              <div className="mt-4 p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200 text-left max-w-2xl mx-auto">
+                💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
+              </div>
+            )}
+          </div>
+
+          {/* 4 Answer Options */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {currentQuestion.options.map((opt, idx) => {
+              const theme = OPTION_THEMES[idx];
+              const isCorrect = isReview && idx === currentQuestion.correctIndex;
+              const isIncorrect = isReview && idx !== currentQuestion.correctIndex;
+              const count = answerStats?.optionCounts?.[idx] || 0;
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-6 rounded-2xl flex items-center justify-between text-white font-bold transition-all ${theme.bg} ${
+                    isReview 
+                      ? isCorrect
+                        ? 'ring-4 ring-white shadow-2xl scale-[1.02] opacity-100'
+                        : 'opacity-40 grayscale-[40%]'
+                      : 'shadow-lg'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xl font-mono">
+                      {theme.shape}
+                    </span>
+                    <span className="text-lg md:text-xl font-medium">{opt}</span>
+                  </div>
+
+                  {isReview && (
+                    <div className="bg-black/30 px-3 py-1 rounded-xl text-sm font-mono flex items-center gap-1.5">
+                      <Users className="w-4 h-4" />
+                      <span>{count}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Review Action Footer */}
+          {isReview && (
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={nextQuestion}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base"
+              >
+                <span>{currentQuestion.questionIndex + 1 >= currentQuestion.totalQuestions ? 'Lihat Papan Skor Akhir' : 'Soal Berikutnya'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
             </div>
           )}
         </div>
-
-        {/* 4 Answer Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {currentQuestion.options.map((opt, idx) => {
-            const theme = OPTION_THEMES[idx];
-            const isCorrect = isReview && idx === currentQuestion.correctIndex;
-            const isIncorrect = isReview && idx !== currentQuestion.correctIndex;
-            const count = answerStats?.optionCounts?.[idx] || 0;
-
-            return (
-              <div
-                key={idx}
-                className={`p-6 rounded-2xl flex items-center justify-between text-white font-bold transition-all ${theme.bg} ${
-                  isReview 
-                    ? isCorrect
-                      ? 'ring-4 ring-white shadow-2xl scale-[1.02] opacity-100'
-                      : 'opacity-40 grayscale-[40%]'
-                    : 'shadow-lg'
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xl font-mono">
-                    {theme.shape}
-                  </span>
-                  <span className="text-lg md:text-xl font-medium">{opt}</span>
-                </div>
-
-                {isReview && (
-                  <div className="bg-black/30 px-3 py-1 rounded-xl text-sm font-mono flex items-center gap-1.5">
-                    <Users className="w-4 h-4" />
-                    <span>{count}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Review Action Footer */}
-        {isReview && (
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={nextQuestion}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base"
-            >
-              <span>{currentQuestion.questionIndex + 1 >= currentQuestion.totalQuestions ? 'Lihat Papan Skor Akhir' : 'Soal Berikutnya'}</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-      </div>
+      </>
     );
   }
 
@@ -506,79 +588,82 @@ export default function HostRoom() {
     const rest = finalPodium.slice(3);
 
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4 text-center">
-        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 mb-3">
-          <Trophy className="w-4 h-4" /> Game Over
-        </span>
-        <h2 className="text-4xl font-extrabold text-white mb-2">Papan Skor Juara!</h2>
-        <p className="text-gray-400 text-sm mb-12">Selamat kepada para pemenang kuis kali ini!</p>
+      <>
+        {renderFloatingReactions()}
+        <div className="max-w-4xl mx-auto py-8 px-4 text-center">
+          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 mb-3">
+            <Trophy className="w-4 h-4" /> Game Over
+          </span>
+          <h2 className="text-4xl font-extrabold text-white mb-2">Papan Skor Juara!</h2>
+          <p className="text-gray-400 text-sm mb-12">Selamat kepada para pemenang kuis kali ini!</p>
 
-        {/* Podium Graphic */}
-        <div className="flex items-end justify-center gap-4 mb-12 max-w-lg mx-auto">
-          {/* 2nd Place */}
-          {top3[1] && (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="text-4xl mb-2">{top3[1].avatar}</span>
-              <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[1].name}</p>
-              <p className="text-xs text-gray-400 mb-2 font-mono">{top3[1].score} pts</p>
-              <div className="w-full h-32 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-2xl flex items-center justify-center text-3xl font-black text-slate-300 border-t-4 border-slate-400 shadow-xl">
-                2
-              </div>
-            </div>
-          )}
-
-          {/* 1st Place */}
-          {top3[0] && (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="text-5xl mb-2 animate-bounce">👑 {top3[0].avatar}</span>
-              <p className="font-extrabold text-yellow-300 text-base truncate max-w-[120px]">{top3[0].name}</p>
-              <p className="text-xs text-yellow-400 font-bold mb-2 font-mono">{top3[0].score} pts</p>
-              <div className="w-full h-44 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl flex items-center justify-center text-5xl font-black text-white border-t-4 border-yellow-300 shadow-2xl">
-                1
-              </div>
-            </div>
-          )}
-
-          {/* 3rd Place */}
-          {top3[2] && (
-            <div className="flex-1 flex flex-col items-center">
-              <span className="text-4xl mb-2">{top3[2].avatar}</span>
-              <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[2].name}</p>
-              <p className="text-xs text-gray-400 mb-2 font-mono">{top3[2].score} pts</p>
-              <div className="w-full h-24 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-2xl flex items-center justify-center text-2xl font-black text-amber-300 border-t-4 border-amber-600 shadow-xl">
-                3
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Rest of Leaderboard */}
-        {rest.length > 0 && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 max-w-md mx-auto mb-8 text-left">
-            <h4 className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-3">Peringkat Lainnya</h4>
-            <div className="space-y-2">
-              {rest.map((p, idx) => (
-                <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-800/60 rounded-xl text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-gray-400 font-bold w-6">{idx + 4}.</span>
-                    <span className="text-lg">{p.avatar}</span>
-                    <span className="font-medium text-white">{p.name}</span>
-                  </div>
-                  <span className="font-mono font-bold text-purple-300">{p.score} pts</span>
+          {/* Podium Graphic */}
+          <div className="flex items-end justify-center gap-4 mb-12 max-w-lg mx-auto">
+            {/* 2nd Place */}
+            {top3[1] && (
+              <div className="flex-1 flex flex-col items-center">
+                <span className="text-4xl mb-2">{top3[1].avatar}</span>
+                <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[1].name}</p>
+                <p className="text-xs text-gray-400 mb-2 font-mono">{top3[1].score} pts</p>
+                <div className="w-full h-32 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-2xl flex items-center justify-center text-3xl font-black text-slate-300 border-t-4 border-slate-400 shadow-xl">
+                  2
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        <button
-          onClick={restartGame}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl transition-all inline-flex items-center gap-2"
-        >
-          <RotateCcw className="w-5 h-5" />
-          <span>Main Lagi di Room Ini</span>
-        </button>
-      </div>
+            {/* 1st Place */}
+            {top3[0] && (
+              <div className="flex-1 flex flex-col items-center">
+                <span className="text-5xl mb-2 animate-bounce">👑 {top3[0].avatar}</span>
+                <p className="font-extrabold text-yellow-300 text-base truncate max-w-[120px]">{top3[0].name}</p>
+                <p className="text-xs text-yellow-400 font-bold mb-2 font-mono">{top3[0].score} pts</p>
+                <div className="w-full h-44 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl flex items-center justify-center text-5xl font-black text-white border-t-4 border-yellow-300 shadow-2xl">
+                  1
+                </div>
+              </div>
+            )}
+
+            {/* 3rd Place */}
+            {top3[2] && (
+              <div className="flex-1 flex flex-col items-center">
+                <span className="text-4xl mb-2">{top3[2].avatar}</span>
+                <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[2].name}</p>
+                <p className="text-xs text-gray-400 mb-2 font-mono">{top3[2].score} pts</p>
+                <div className="w-full h-24 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-2xl flex items-center justify-center text-2xl font-black text-amber-300 border-t-4 border-amber-600 shadow-xl">
+                  3
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Rest of Leaderboard */}
+          {rest.length > 0 && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 max-w-md mx-auto mb-8 text-left">
+              <h4 className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-3">Peringkat Lainnya</h4>
+              <div className="space-y-2">
+                {rest.map((p, idx) => (
+                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-800/60 rounded-xl text-sm">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-gray-400 font-bold w-6">{idx + 4}.</span>
+                      <span className="text-lg">{p.avatar}</span>
+                      <span className="font-medium text-white">{p.name}</span>
+                    </div>
+                    <span className="font-mono font-bold text-purple-300">{p.score} pts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={restartGame}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl transition-all inline-flex items-center gap-2"
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span>Main Lagi di Room Ini</span>
+          </button>
+        </div>
+      </>
     );
   }
 

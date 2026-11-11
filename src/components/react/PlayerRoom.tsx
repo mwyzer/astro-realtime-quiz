@@ -8,6 +8,8 @@ import {
 
 const AVATARS = ['🦊', '🐯', '🚀', '🐼', '👾', '🦄', '⚡', '🥑', '🦁', '🦉'];
 
+const REACTION_EMOJIS = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
+
 const OPTION_THEMES = [
   { bg: 'bg-red-500', active: 'active:bg-red-600', ring: 'ring-red-400', shape: '▲', label: 'Merah' },
   { bg: 'bg-blue-500', active: 'active:bg-blue-600', ring: 'ring-blue-400', shape: '◆', label: 'Biru' },
@@ -226,6 +228,37 @@ export default function PlayerRoom() {
     }
   };
 
+  const sendReaction = (emoji: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+      wsRef.current.send(JSON.stringify({
+        type: 'SEND_REACTION',
+        emoji
+      }));
+      sound.playPop();
+    }
+  };
+
+  const renderReactionDock = () => {
+    return (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/90 border border-purple-500/30 backdrop-blur-md px-3 py-2 rounded-2xl shadow-2xl flex items-center gap-1 sm:gap-2">
+        <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider px-2 hidden sm:inline">
+          Reaksi:
+        </span>
+        {REACTION_EMOJIS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => sendReaction(emoji)}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/80 hover:bg-purple-600/30 active:scale-90 transition-all flex items-center justify-center text-xl sm:text-2xl border border-white/10 hover:border-purple-400/50 shadow-sm cursor-pointer"
+            title={`Kirim ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   // 1. Join Room Phase
   if (phase === 'JOIN') {
     return (
@@ -326,19 +359,22 @@ export default function PlayerRoom() {
   // 2. Waiting in Lobby Phase
   if (phase === 'LOBBY') {
     return (
-      <div className="max-w-md mx-auto py-12 px-4 text-center">
-        <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-          <div className="text-6xl mb-4 animate-bounce">{avatar}</div>
-          <h2 className="text-2xl font-black text-white">{name}</h2>
-          <p className="text-purple-300 text-xs font-mono mt-1 mb-6">Room PIN: {roomCode}</p>
+      <>
+        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
+          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
+            <div className="text-6xl mb-4 animate-bounce">{avatar}</div>
+            <h2 className="text-2xl font-black text-white">{name}</h2>
+            <p className="text-purple-300 text-xs font-mono mt-1 mb-6">Room PIN: {roomCode}</p>
 
-          <div className="py-6 px-4 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
-            <div className="inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-white font-bold text-sm">Kamu sudah bergabung!</p>
-            <p className="text-gray-400 text-xs mt-1">Perhatikan layar Host. Kuis akan segera dimulai...</p>
+            <div className="py-6 px-4 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
+              <div className="inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-white font-bold text-sm">Kamu sudah bergabung!</p>
+              <p className="text-gray-400 text-xs mt-1">Perhatikan layar Host. Kuis akan segera dimulai...</p>
+            </div>
           </div>
         </div>
-      </div>
+        {renderReactionDock()}
+      </>
     );
   }
 
@@ -412,107 +448,116 @@ export default function PlayerRoom() {
     const chosenTheme = selectedOption !== null ? OPTION_THEMES[selectedOption] : null;
 
     return (
-      <div className="max-w-md mx-auto py-16 px-4 text-center">
-        <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-          <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Send className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-extrabold text-white mb-2">Jawaban Terkirim!</h2>
-          <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
-
-          {chosenTheme && (
-            <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg`}>
-              <span>{chosenTheme.shape}</span>
-              <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
+      <>
+        <div className="max-w-md mx-auto py-16 px-4 pb-24 text-center">
+          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
+            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Send className="w-8 h-8" />
             </div>
-          )}
+            <h2 className="text-2xl font-extrabold text-white mb-2">Jawaban Terkirim!</h2>
+            <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
+
+            {chosenTheme && (
+              <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg`}>
+                <span>{chosenTheme.shape}</span>
+                <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+        {renderReactionDock()}
+      </>
     );
   }
 
   // 6. Result Phase (Instant feedback after question ends)
   if (phase === 'RESULT' && resultData) {
     return (
-      <div className="max-w-md mx-auto py-12 px-4 text-center">
-        <div className={`rounded-3xl p-8 backdrop-blur shadow-2xl border ${
-          resultData.isCorrect 
-            ? 'bg-emerald-950/60 border-emerald-500/50' 
-            : 'bg-red-950/60 border-red-500/50'
-        }`}>
-          {resultData.isCorrect ? (
-            <div>
-              <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-4 animate-bounce" />
-              <h2 className="text-3xl font-black text-white">BENAR! 🎉</h2>
-              <p className="text-emerald-300 font-mono text-2xl font-bold mt-2">
-                +{resultData.pointsEarned} pts
-              </p>
-              {resultData.streak > 1 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 text-xs font-bold mt-3">
-                  <Flame className="w-4 h-4 fill-current" />
-                  <span>{resultData.streak}x Beruntun!</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <XCircle className="w-20 h-20 text-red-400 mx-auto mb-4" />
-              <h2 className="text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
-              <p className="text-red-300 text-sm mt-2">
-                Jawaban benar: <strong>{questionData?.options[resultData.correctIndex]}</strong>
-              </p>
-            </div>
-          )}
+      <>
+        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
+          <div className={`rounded-3xl p-8 backdrop-blur shadow-2xl border ${
+            resultData.isCorrect 
+              ? 'bg-emerald-950/60 border-emerald-500/50' 
+              : 'bg-red-950/60 border-red-500/50'
+          }`}>
+            {resultData.isCorrect ? (
+              <div>
+                <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-4 animate-bounce" />
+                <h2 className="text-3xl font-black text-white">BENAR! 🎉</h2>
+                <p className="text-emerald-300 font-mono text-2xl font-bold mt-2">
+                  +{resultData.pointsEarned} pts
+                </p>
+                {resultData.streak > 1 && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 text-xs font-bold mt-3">
+                    <Flame className="w-4 h-4 fill-current" />
+                    <span>{resultData.streak}x Beruntun!</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <XCircle className="w-20 h-20 text-red-400 mx-auto mb-4" />
+                <h2 className="text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
+                <p className="text-red-300 text-sm mt-2">
+                  Jawaban benar: <strong>{questionData?.options[resultData.correctIndex]}</strong>
+                </p>
+              </div>
+            )}
 
-          <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-around text-center">
-            <div>
-              <span className="text-xs uppercase text-gray-400 font-bold block">Peringkatmu</span>
-              <span className="text-2xl font-black text-white font-mono">#{resultData.rank}</span>
-            </div>
-            <div>
-              <span className="text-xs uppercase text-gray-400 font-bold block">Total Skor</span>
-              <span className="text-2xl font-black text-purple-300 font-mono">{resultData.totalScore}</span>
+            <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-around text-center">
+              <div>
+                <span className="text-xs uppercase text-gray-400 font-bold block">Peringkatmu</span>
+                <span className="text-2xl font-black text-white font-mono">#{resultData.rank}</span>
+              </div>
+              <div>
+                <span className="text-xs uppercase text-gray-400 font-bold block">Total Skor</span>
+                <span className="text-2xl font-black text-purple-300 font-mono">{resultData.totalScore}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+        {renderReactionDock()}
+      </>
     );
   }
 
   // 7. Finished / Game Over Phase
   if (phase === 'FINISHED' && finalRank) {
     return (
-      <div className="max-w-md mx-auto py-12 px-4 text-center">
-        <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-          <Award className="w-20 h-20 text-yellow-400 mx-auto mb-4 animate-bounce" />
-          <h2 className="text-3xl font-black text-white">Permainan Selesai!</h2>
-          <p className="text-gray-400 text-xs mt-1 mb-6">Hebat, kamu telah menyelesaikan seluruh pertanyaan!</p>
+      <>
+        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
+          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
+            <Award className="w-20 h-20 text-yellow-400 mx-auto mb-4 animate-bounce" />
+            <h2 className="text-3xl font-black text-white">Permainan Selesai!</h2>
+            <p className="text-gray-400 text-xs mt-1 mb-6">Hebat, kamu telah menyelesaikan seluruh pertanyaan!</p>
 
-          <div className="p-6 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
-            <span className="text-xs uppercase text-gray-400 font-bold">Peringkat Akhirmu</span>
-            <p className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400 my-2 font-mono">
-              #{finalRank.rank}
-            </p>
-            <p className="text-xs text-gray-400">
-              dari total {finalRank.totalPlayers} peserta
-            </p>
-            <div className="mt-4 pt-4 border-t border-slate-700">
-              <span className="text-xs text-gray-400">Total Skor Akhir</span>
-              <p className="text-2xl font-mono font-bold text-purple-300">{finalRank.score} pts</p>
+            <div className="p-6 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
+              <span className="text-xs uppercase text-gray-400 font-bold">Peringkat Akhirmu</span>
+              <p className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400 my-2 font-mono">
+                #{finalRank.rank}
+              </p>
+              <p className="text-xs text-gray-400">
+                dari total {finalRank.totalPlayers} peserta
+              </p>
+              <div className="mt-4 pt-4 border-t border-slate-700">
+                <span className="text-xs text-gray-400">Total Skor Akhir</span>
+                <p className="text-2xl font-mono font-bold text-purple-300">{finalRank.score} pts</p>
+              </div>
             </div>
-          </div>
 
-          <button
-            onClick={() => {
-              setPhase('JOIN');
-              setPin('');
-            }}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all"
-          >
-            Main Lagi di Room Baru
-          </button>
+            <button
+              onClick={() => {
+                setPhase('JOIN');
+                setPin('');
+              }}
+              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all"
+            >
+              Main Lagi di Room Baru
+            </button>
+          </div>
         </div>
-      </div>
+        {renderReactionDock()}
+      </>
     );
   }
 
