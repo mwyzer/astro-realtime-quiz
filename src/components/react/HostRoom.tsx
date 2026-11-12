@@ -63,6 +63,57 @@ export default function HostRoom() {
   const [powerupToast, setPowerupToast] = useState<{ text: string; id: number } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingCreateQuizIdRef = useRef<string | null>(null);
+
+  const getWsUrl = () => {
+    const isDevPort = typeof window !== 'undefined' && window.location.port === '4321';
+    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return (import.meta as any).env?.PUBLIC_WS_URL || (
+      isDevPort 
+        ? `ws://${window.location.hostname}:3001` 
+        : `${wsProtocol}//${window.location.host}`
+    );
+  };
+
+  const connectWs = () => {
+    if (typeof window === 'undefined') return null;
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
+      return wsRef.current;
+    }
+
+    const ws = new WebSocket(getWsUrl());
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setWsConnected(true);
+      setErrorMsg(null);
+      ws.send(JSON.stringify({ type: 'GET_QUIZZES' }));
+      if (pendingCreateQuizIdRef.current) {
+        const pendingQuizId = pendingCreateQuizIdRef.current;
+        pendingCreateQuizIdRef.current = null;
+        ws.send(JSON.stringify({ type: 'CREATE_ROOM', quizId: pendingQuizId, gameMode }));
+      }
+    };
+
+    ws.onclose = () => {
+      setWsConnected(false);
+    };
+
+    ws.onerror = () => {
+      setWsConnected(false);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+      } catch (err) {
+        console.error('Error parsing WS message:', err);
+      }
+    };
+
+    return ws;
+  };
 
   useEffect(() => {
     const isDevPort = typeof window !== 'undefined' && window.location.port === '4321';
@@ -82,41 +133,10 @@ export default function HostRoom() {
       })
       .catch(() => {});
 
-    const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || (
-      isDevPort 
-        ? `ws://${window.location.hostname}:3001` 
-        : `${wsProtocol}//${window.location.host}`
-    );
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setWsConnected(true);
-      setErrorMsg(null);
-      ws.send(JSON.stringify({ type: 'GET_QUIZZES' }));
-    };
-
-    ws.onclose = () => {
-      setWsConnected(false);
-    };
-
-    ws.onerror = () => {
-      setErrorMsg('Gagal terhubung ke server WebSocket di port 3001. Pastikan server websocket aktif!');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        handleServerMessage(msg);
-      } catch (err) {
-        console.error('Error parsing WS message:', err);
-      }
-    };
+    const ws = connectWs();
 
     return () => {
-      ws.close();
+      if (ws) ws.close();
     };
   }, []);
 
@@ -273,8 +293,12 @@ export default function HostRoom() {
   };
 
   const createRoom = (quizId: string) => {
+    setErrorMsg(null);
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode }));
+    } else {
+      pendingCreateQuizIdRef.current = quizId;
+      connectWs();
     }
   };
 
@@ -507,18 +531,15 @@ export default function HostRoom() {
       <div className="max-w-5xl mx-auto py-8 px-4">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#151c2c] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000]">
-              HOST ROOM SETUP
-            </span>
-            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-mono font-bold border-2 border-black shadow-[2px_2px_0px_#000] ${
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold border-2 border-black shadow-[2px_2px_0px_#000] ${
               wsConnected ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'
             }`}>
               <Radio className="w-3.5 h-3.5" />
-              {wsConnected ? 'Server Online' : 'Connecting...'}
+              {wsConnected ? 'Server Online' : 'Menghubungkan Server...'}
             </span>
           </div>
-          <h2 className="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white">Pilih Paket Kuis</h2>
-          <p className="text-slate-400 text-sm mt-2 font-medium">Pilih salah satu paket soal di bawah untuk membuka room kuis baru.</p>
+          <h1 className="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white">Pilih Paket Kuis</h1>
+          <p className="text-slate-400 text-sm mt-2 font-medium">Pilih mode arena 3D dan salah satu paket soal di bawah untuk membuka room kuis baru.</p>
         </div>
 
         {/* Mode Selector Neo-Brutalist */}
@@ -529,29 +550,29 @@ export default function HostRoom() {
           {availableQuizzes.map((quiz) => (
             <div 
               key={quiz.id}
-              className="arcade-card p-6 flex flex-col justify-between bg-[#151c2c]"
+              className="iso-card p-6 flex flex-col justify-between bg-[#151c2c]"
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
-                    {quiz.title}
+                    PAKET KUIS
                   </span>
                   <span className="text-xs font-mono font-bold text-slate-300 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
                     {quiz.questionCount} SOAL
                   </span>
                 </div>
-                <h3 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">{quiz.title}</h3>
+                <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">{quiz.title}</h2>
                 <p className="text-slate-300 text-sm leading-relaxed mb-6 font-medium">
                   {quiz.description}
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={() => createRoom(quiz.id)}
-                className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl arcade-btn flex items-center justify-center gap-2"
+                className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl iso-btn flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Buka Room Kuis Ini</span>
-                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ))}
