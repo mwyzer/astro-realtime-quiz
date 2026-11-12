@@ -25,8 +25,8 @@ const { title, description = 'Aplikasi Kuis Realtime Multi-pemain dengan Arsitek
     <header class="border-b-2 border-black bg-[#111827] sticky top-0 z-50">
       <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/" class="flex items-center gap-2.5 group" aria-label="Beranda AstroQuiz Live">
-          <div class="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 font-black flex items-center justify-center border-2 border-black shadow-[2px_2px_0px_#000] group-hover:translate-x-0.5 group-hover:translate-y-0.5 transition-transform">
-            <span class="text-lg leading-none select-none">⚡</span>
+          <div class="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 font-['Space_Grotesk',sans-serif] font-black flex items-center justify-center border-2 border-black shadow-[2px_2px_0px_#000] group-hover:translate-x-0.5 group-hover:translate-y-0.5 transition-transform">
+            <span class="text-sm tracking-tighter leading-none select-none">AQ</span>
           </div>
           <div>
             <span class="font-['Space_Grotesk',sans-serif] font-black text-xl text-white tracking-tight">
@@ -69,10 +69,10 @@ const { title, description = 'Aplikasi Kuis Realtime Multi-pemain dengan Arsitek
         <p class="font-medium">
           AstroQuiz Live: Platform Kuis Interaktif Realtime berbasis Astro, React Islands, dan WebSockets.
         </p>
-        <div class="flex items-center gap-3 text-slate-300 font-mono text-[11px]">
-          <span class="px-2 py-0.5 bg-[#151c2c] border border-black rounded">Astro 5</span>
-          <span class="px-2 py-0.5 bg-[#151c2c] border border-black rounded">React 19</span>
-          <span class="px-2 py-0.5 bg-[#151c2c] border border-black rounded">Three.js 3D</span>
+        <div class="flex items-center gap-4 text-slate-300 font-mono text-xs font-bold">
+          <a href="/host" class="hover:text-amber-400 transition-colors">Host</a>
+          <a href="/play" class="hover:text-amber-400 transition-colors">Peserta</a>
+          <a href="/bank" class="hover:text-amber-400 transition-colors">Bank Soal</a>
         </div>
       </div>
     </footer>

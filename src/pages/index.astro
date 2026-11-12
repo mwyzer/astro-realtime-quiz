@@ -10,12 +10,6 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
       <div class="grid lg:grid-cols-12 gap-8 items-center">
         <!-- Kolom Kiri: Copywriting Tegas & Aksi Utama -->
         <div class="lg:col-span-7 text-left">
-          <div class="inline-flex items-center gap-2 px-3 py-1 bg-[#151c2c] border-2 border-black shadow-[2px_2px_0px_#000] text-amber-400 text-xs font-mono font-bold rounded-md mb-4">
-            <span>SOCKET V2 ONLINE</span>
-            <span class="text-slate-400">•</span>
-            <span>MULTI-ARENA 3D</span>
-          </div>
-
           <h1 class="font-['Space_Grotesk',sans-serif] text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08] mb-5">
             Kuis Realtime Taktil dengan <span class="text-amber-400 underline decoration-black decoration-4">Arena 3D Roblox</span>
           </h1>
@@ -41,19 +35,16 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
           </div>
         </div>
 
-        <!-- Kolom Kanan: Terminal Gabung Cepat (Quick-Join Gamepad) -->
+        <!-- Kolom Kanan: Panel Gabung Cepat (Quick-Join Gamepad) -->
         <div class="lg:col-span-5">
           <div class="arcade-card p-6 sm:p-7 relative bg-[#151c2c]">
             <div class="flex items-center justify-between pb-4 mb-5 border-b-2 border-black">
-              <div class="flex items-center gap-2">
-                <span class="w-3 h-3 rounded-full bg-red-500 border border-black"></span>
-                <span class="w-3 h-3 rounded-full bg-amber-400 border border-black"></span>
-                <span class="w-3 h-3 rounded-full bg-emerald-500 border border-black"></span>
-                <span class="font-mono text-xs font-bold text-slate-300 ml-1">QUICK_CONTROLLER.EXE</span>
-              </div>
-              <span class="text-[11px] font-mono font-bold bg-[#0b0f19] px-2 py-0.5 rounded border border-black text-amber-400">
-                CLIENT V2.4
-              </span>
+              <h2 class="font-['Space_Grotesk',sans-serif] text-lg font-black text-white tracking-tight">
+                Masuk Cepat dengan PIN
+              </h2>
+              <a href="/play" class="text-xs font-mono font-bold bg-[#0b0f19] hover:bg-slate-800 px-2.5 py-1 rounded border border-black text-amber-400 transition-colors">
+                Layar Penuh
+              </a>
             </div>
 
             <form action="/play" method="GET" class="space-y-4">
@@ -82,19 +73,19 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
             </form>
 
             <div class="mt-5 pt-4 border-t-2 border-black">
-              <p class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider font-mono">
-                Pilih Jalur Arena:
+              <p class="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider font-mono">
+                3 Mode Arena 3D di Lobby Host:
               </p>
               <div class="grid grid-cols-3 gap-2 text-center text-xs font-bold font-mono">
-                <div class="p-2 bg-[#0b0f19] border border-black rounded text-amber-400">
-                  💣 Estafet Bom
-                </div>
-                <div class="p-2 bg-[#0b0f19] border border-black rounded text-blue-400">
-                  🌉 Jembatan Kaca
-                </div>
-                <div class="p-2 bg-[#0b0f19] border border-black rounded text-red-400">
-                  🌋 Lantai Lava
-                </div>
+                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-amber-400 transition-colors">
+                  Estafet Bom
+                </a>
+                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-blue-400 transition-colors">
+                  Jembatan Kaca
+                </a>
+                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-red-400 transition-colors">
+                  Lantai Lava
+                </a>
               </div>
             </div>
           </div>
@@ -104,7 +95,7 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
   </section>
 
   <!-- Showcase Mode Arena 3D Asimetris -->
-  <section class="py-14 sm:py-20 border-b-2 border-black bg-[#0d121f]">
+  <section id="mode-arena" class="py-14 sm:py-20 border-b-2 border-black bg-[#0d121f]">
     <div class="max-w-6xl mx-auto px-4">
       <div class="mb-10 text-left">
         <h2 class="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
