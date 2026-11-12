@@ -948,13 +948,28 @@ export default function HostRoom() {
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full bg-[#0b0f19] border-2 border-black h-3 rounded-full overflow-hidden mb-6 shadow-[2px_2px_0px_#000]">
+          <div className="w-full bg-[#0b0f19] border-2 border-black h-3 rounded-full overflow-hidden mb-4 shadow-[2px_2px_0px_#000]">
             <div 
               className={`h-full transition-all duration-1000 ${
                 timeLeft <= 5 ? 'bg-red-500' : 'bg-amber-400'
               }`}
               style={{ width: `${percentTime}%` }}
             />
+          </div>
+
+          {/* Prominent Stage Question Card (Always Visible in 3D & Classic Modes) */}
+          <div className="iso-card p-5 sm:p-6 mb-5 bg-[#151c2c] border-2 border-black shadow-[5px_5px_0px_#000]">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-mono font-black uppercase tracking-wider text-amber-400 bg-[#0b0f19] px-2.5 py-0.5 rounded border border-black">
+                PERTANYAAN SOAL #{currentQuestion.questionIndex + 1}
+              </span>
+              <span className="text-xs font-mono text-slate-300">
+                {isReview ? 'Waktu Habis: Pembahasan Jawaban' : 'Peserta sedang menjawab di Arena 3D'}
+              </span>
+            </div>
+            <h2 className="font-['Space_Grotesk',sans-serif] text-xl sm:text-2xl md:text-3xl font-black text-white leading-snug">
+              {currentQuestion.text}
+            </h2>
           </div>
 
           {/* 3D Roblox Arena */}

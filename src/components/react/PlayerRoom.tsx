@@ -746,6 +746,21 @@ export default function PlayerRoom() {
               </div>
             </div>
 
+            {/* Prominent Question Banner Card (Always Visible on Mobile & Desktop) */}
+            <div className="iso-card p-4 sm:p-5 mb-3 bg-[#151c2c] border-2 border-black shadow-[4px_4px_0px_#000]">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[11px] font-mono font-black uppercase tracking-wider text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+                  PERTANYAAN AKTIF
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Pilih jawaban dengan tombol atau lari ke petak 3D
+                </span>
+              </div>
+              <h2 className="font-['Space_Grotesk',sans-serif] text-base sm:text-xl md:text-2xl font-black text-white leading-snug">
+                {questionData.text}
+              </h2>
+            </div>
+
             {/* Power-Up Lifelines Bar */}
             <div className="bg-[#151c2c] border-2 border-black p-3 rounded-xl mb-3 shadow-[2px_2px_0px_#000]">
               <div className="flex items-center justify-between gap-2 mb-2">

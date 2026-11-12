@@ -1323,6 +1323,7 @@ export default function RobloxArena3D({
     let lastTime = performance.now();
     let lastNetworkSend = 0;
     let lastZoneDetected: number | null = null;
+    let lastOptionsKey = (optionsRef.current || []).join('||');
 
     const animate = (timeNow: number) => {
       animationFrameId = requestAnimationFrame(animate);
@@ -1330,6 +1331,23 @@ export default function RobloxArena3D({
       const delta = Math.min((timeNow - lastTime) / 1000, 0.1);
       lastTime = timeNow;
       const time = timeNow * 0.001;
+
+      // Refresh 3D floor pad option text dynamically when question options change
+      const currentOptionsKey = (optionsRef.current || []).join('||');
+      if (currentOptionsKey !== lastOptionsKey) {
+        lastOptionsKey = currentOptionsKey;
+        const opts = optionsRef.current || [];
+        interactiveMeshes.forEach((mesh, idx) => {
+          const q = QUADRANT_CONFIGS[idx];
+          if (!q) return;
+          const mats = mesh.material as THREE.Material[];
+          if (Array.isArray(mats) && mats[2]) {
+            const topMat = mats[2] as THREE.MeshBasicMaterial;
+            topMat.map = createPanelTexture(q.shape, q.label, q.hex, opts[idx] || '', isBridge);
+            topMat.needsUpdate = true;
+          }
+        });
+      }
 
       // Rotate Trophy if in Glass Bridge
       if (trophyGroup) {
@@ -1856,17 +1874,17 @@ export default function RobloxArena3D({
         </button>
       </div>
 
-      {/* Top HUD Overlay (Question info & timer) */}
+      {/* Top HUD Overlay (Question info & timer inside 3D Canvas, positioned below top controls so it never overlaps or hides on mobile) */}
       {questionText && (
-        <div className="absolute top-3 left-3 right-3 sm:left-auto sm:right-3 flex items-center justify-end gap-2 pointer-events-none z-10">
-          <div className="bg-[#0b0f19] border-2 border-black px-3.5 py-1.5 rounded-xl shadow-[3px_3px_0px_#000] max-w-sm sm:max-w-md md:max-w-lg truncate hidden sm:block">
-            <span className="text-xs sm:text-sm font-bold text-white truncate block font-['Space_Grotesk']">
-              {questionText}
+        <div className="absolute top-14 left-3 right-3 flex items-start justify-between gap-2 pointer-events-none z-20">
+          <div className="bg-[#0b0f19]/95 border-2 border-amber-400 px-3.5 py-2 rounded-xl shadow-[3px_3px_0px_#000] flex-1 max-w-2xl">
+            <span className="text-xs sm:text-sm font-black text-white leading-snug line-clamp-2 block font-['Space_Grotesk']">
+              ❓ {questionText}
             </span>
           </div>
 
           {typeof timeLeft === 'number' && (
-            <div className={`px-3 py-1 rounded-xl font-mono font-black text-sm border-2 border-black shadow-[3px_3px_0px_#000] shrink-0 ${
+            <div className={`px-3 py-1.5 rounded-xl font-mono font-black text-sm border-2 border-black shadow-[3px_3px_0px_#000] shrink-0 ${
               timeLeft <= 5 ? 'bg-red-600 text-white animate-pulse' : 'bg-amber-400 text-slate-950'
             }`}>
               ⏱️ {timeLeft}s
@@ -1877,7 +1895,7 @@ export default function RobloxArena3D({
 
       {/* Bomb Tag Dynamic Banner Alert */}
       {isBombTag && phase === 'QUESTION' && (
-        <div className="absolute top-14 left-3 right-3 flex justify-center pointer-events-none z-20">
+        <div className={`absolute left-3 right-3 flex justify-center pointer-events-none z-20 ${questionText ? 'top-28 sm:top-28' : 'top-14'}`}>
           {isLocalHoldingBomb ? (
             <div className="bg-red-600 border-2 border-black text-white px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] animate-bounce flex items-center gap-2">
               <span className="text-lg">💣🔥</span>
@@ -1893,14 +1911,18 @@ export default function RobloxArena3D({
       )}
 
       {/* Current Standing Zone Indicator */}
-      <div className={`absolute left-3 pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24 sm:top-24' : 'top-14'}`}>
+      <div className={`absolute left-3 pointer-events-none z-10 ${
+        isBombTag && phase === 'QUESTION'
+          ? (questionText ? 'top-40' : 'top-28')
+          : (questionText ? 'top-28' : 'top-14')
+      }`}>
         {currentStandingZone !== null && QUADRANT_CONFIGS[currentStandingZone] ? (
           <div className="bg-[#151c2c] border-2 border-black px-3 py-1 rounded-xl text-xs font-bold text-white shadow-[2px_2px_0px_#000] flex items-center gap-1.5 animate-bounce-short">
             <span>📍 Petak Dipilih:</span>
             <span className="text-amber-400 bg-[#0b0f19] border border-black px-2 py-0.5 rounded font-mono font-black">
               {QUADRANT_CONFIGS[currentStandingZone].shape} {QUADRANT_CONFIGS[currentStandingZone].label}
+              {options[currentStandingZone] ? `: ${options[currentStandingZone]}` : ''}
             </span>
-            <span className="text-[11px] text-slate-300">(Bisa pindah sebelum waktu habis)</span>
           </div>
         ) : (
           <div className="bg-[#151c2c] border-2 border-black px-3 py-1 rounded-xl text-[11px] font-bold text-slate-400 shadow-[2px_2px_0px_#000]">
@@ -1914,7 +1936,11 @@ export default function RobloxArena3D({
       </div>
 
       {/* Keyboard movement & Drag Orbit hint */}
-      <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-[#0b0f19] px-2.5 py-1 rounded-xl text-[11px] text-slate-300 border-2 border-black shadow-[2px_2px_0px_#000] pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24' : 'top-14'}`}>
+      <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-[#0b0f19] px-2.5 py-1 rounded-xl text-[11px] text-slate-300 border-2 border-black shadow-[2px_2px_0px_#000] pointer-events-none z-10 ${
+        isBombTag && phase === 'QUESTION'
+          ? (questionText ? 'top-40' : 'top-28')
+          : (questionText ? 'top-28' : 'top-14')
+      }`}>
         <span>Gunakan</span>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">W</kbd>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">A</kbd>
