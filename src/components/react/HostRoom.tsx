@@ -591,24 +591,27 @@ export default function HostRoom() {
         {renderPowerupToast()}
         <div className="max-w-5xl mx-auto py-6 px-4 pb-24">
           {/* Top Header Card with PIN & QR Code */}
-          <div className="arcade-card p-6 sm:p-8 bg-[#151c2c] mb-8 relative">
-            <div className="absolute top-4 right-4 flex items-center gap-2">
-              {renderModeSelector(true)}
-              <button 
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 bg-[#1e293b] hover:bg-slate-700 text-slate-200 rounded-lg border-2 border-black text-xs shadow-[2px_2px_0px_#000]"
-                title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
+          <div className="iso-card p-6 sm:p-8 bg-[#151c2c] mb-8 relative">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b-2 border-black">
+              <p className="text-slate-300 text-xs font-mono font-bold uppercase tracking-wider">
+                Buka di browser: <span className="text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">/play</span> atau scan QR
+              </p>
+              <div className="flex items-center gap-2">
+                {renderModeSelector(true)}
+                <button 
+                  type="button"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="p-2 bg-[#1e293b] hover:bg-slate-700 text-slate-200 rounded-lg border-2 border-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
+                  title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
+                >
+                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               {/* Left Column: PIN & Info */}
               <div className="flex-1 text-center md:text-left">
-                <p className="text-slate-400 text-xs font-mono font-bold uppercase tracking-wider mb-2">
-                  Buka di browser: <span className="text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">/play</span> atau scan QR
-                </p>
 
                 <div className="inline-flex items-center gap-3 my-2 bg-[#0b0f19] border-2 border-black p-3 sm:p-4 rounded-xl shadow-[3px_3px_0px_#000]">
                   <span className="text-5xl sm:text-6xl md:text-7xl font-black tracking-widest text-amber-400 font-mono tabular-nums">
