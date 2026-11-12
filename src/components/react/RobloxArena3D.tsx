@@ -9,13 +9,16 @@ export interface Player3DData {
   z?: number;
   jumping?: boolean;
   currentAnswer?: number | null;
+  exploded?: boolean;
 }
 
-export type Arena3DMode = 'glass_bridge' | 'lava_tiles';
+export type Arena3DMode = 'bomb_tag' | 'glass_bridge' | 'lava_tiles';
 
 interface RobloxArena3DProps {
   phase: string;
   arenaMode?: Arena3DMode;
+  bombHolderId?: string | null;
+  explodedPlayerId?: string | null;
   isHost?: boolean;
   localPlayerId?: string | null;
   players: Player3DData[];
@@ -29,10 +32,10 @@ interface RobloxArena3DProps {
 }
 
 const QUADRANT_CONFIGS = [
-  { index: 0, x: -6, z: -6, glassX: -7.2, color: 0xef4444, hex: '#ef4444', shape: '▲', label: 'Merah' },
-  { index: 1, x: 6, z: -6, glassX: -2.4, color: 0x3b82f6, hex: '#3b82f6', shape: '◆', label: 'Biru' },
-  { index: 2, x: -6, z: 6, glassX: 2.4, color: 0xf59e0b, hex: '#f59e0b', shape: '●', label: 'Kuning' },
-  { index: 3, x: 6, z: 6, glassX: 7.2, color: 0x10b981, hex: '#10b981', shape: '■', label: 'Hijau' },
+  { index: 0, x: -6, z: -6, glassX: -7.2, bombX: -7.5, bombZ: -7.5, color: 0xef4444, hex: '#ef4444', shape: '▲', label: 'Merah' },
+  { index: 1, x: 6, z: -6, glassX: -2.4, bombX: 7.5, bombZ: -7.5, color: 0x3b82f6, hex: '#3b82f6', shape: '◆', label: 'Biru' },
+  { index: 2, x: -6, z: 6, glassX: 2.4, bombX: -7.5, bombZ: 7.5, color: 0xf59e0b, hex: '#f59e0b', shape: '●', label: 'Kuning' },
+  { index: 3, x: 6, z: 6, glassX: 7.2, bombX: 7.5, bombZ: 7.5, color: 0x10b981, hex: '#10b981', shape: '■', label: 'Hijau' },
 ];
 
 const TORSO_COLORS = [
@@ -42,7 +45,9 @@ const TORSO_COLORS = [
 
 export default function RobloxArena3D({
   phase,
-  arenaMode = 'glass_bridge',
+  arenaMode = 'bomb_tag',
+  bombHolderId = null,
+  explodedPlayerId = null,
   isHost = false,
   localPlayerId,
   players,
@@ -58,6 +63,8 @@ export default function RobloxArena3D({
 
   // Local movement state
   const isGlassBridge = arenaMode === 'glass_bridge';
+  const isBombTag = arenaMode === 'bomb_tag';
+
   const localPosRef = useRef<{ x: number; z: number; y: number; vy: number; jumping: boolean }>({
     x: 0,
     z: isGlassBridge ? 7.2 : 0,
@@ -83,6 +90,12 @@ export default function RobloxArena3D({
   const arenaModeRef = useRef(arenaMode);
   arenaModeRef.current = arenaMode;
 
+  const bombHolderIdRef = useRef(bombHolderId);
+  bombHolderIdRef.current = bombHolderId;
+
+  const explodedPlayerIdRef = useRef(explodedPlayerId);
+  explodedPlayerIdRef.current = explodedPlayerId;
+
   const correctIndexRef = useRef(correctIndex);
   correctIndexRef.current = correctIndex;
 
@@ -99,6 +112,9 @@ export default function RobloxArena3D({
       if (arenaMode === 'glass_bridge') {
         localPosRef.current.x = q.glassX + (Math.random() - 0.5) * 0.6;
         localPosRef.current.z = 0 + (Math.random() - 0.5) * 0.8;
+      } else if (arenaMode === 'bomb_tag') {
+        localPosRef.current.x = q.bombX + (Math.random() - 0.5) * 1.5;
+        localPosRef.current.z = q.bombZ + (Math.random() - 0.5) * 1.5;
       } else {
         localPosRef.current.x = q.x + (Math.random() - 0.5) * 2;
         localPosRef.current.z = q.z + (Math.random() - 0.5) * 2;
@@ -135,10 +151,14 @@ export default function RobloxArena3D({
 
     const scene = new THREE.Scene();
     const isBridge = arenaMode === 'glass_bridge';
+    const isBomb = arenaMode === 'bomb_tag';
 
     if (isBridge) {
       scene.background = new THREE.Color(0x090d16); // deep cyber abyss
       scene.fog = new THREE.FogExp2(0x090d16, 0.016);
+    } else if (isBomb) {
+      scene.background = new THREE.Color(0x09090b); // dark industrial arena
+      scene.fog = new THREE.FogExp2(0x09090b, 0.015);
     } else {
       scene.background = new THREE.Color(0x0f172a); // dark midnight blue
       scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
@@ -148,6 +168,9 @@ export default function RobloxArena3D({
     if (isBridge) {
       camera.position.set(0, 15.5, 17.5);
       camera.lookAt(0, -0.6, -0.5);
+    } else if (isBomb) {
+      camera.position.set(0, 20.5, 22.5);
+      camera.lookAt(0, -0.5, 0);
     } else {
       camera.position.set(0, 20, 23);
       camera.lookAt(0, -0.5, 0);
@@ -161,24 +184,28 @@ export default function RobloxArena3D({
     container.appendChild(renderer.domElement);
 
     // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, isBridge ? 0.95 : 0.85);
+    const ambientLight = new THREE.AmbientLight(0xffffff, isBridge ? 0.95 : (isBomb ? 1.05 : 0.85));
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, isBridge ? 1.4 : 1.2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, isBridge ? 1.4 : (isBomb ? 1.5 : 1.2));
     dirLight.position.set(16, 28, 16);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     dirLight.shadow.camera.near = 0.5;
     dirLight.shadow.camera.far = 100;
-    dirLight.shadow.camera.left = -18;
-    dirLight.shadow.camera.right = 18;
-    dirLight.shadow.camera.top = 18;
-    dirLight.shadow.camera.bottom = -18;
+    dirLight.shadow.camera.left = -20;
+    dirLight.shadow.camera.right = 20;
+    dirLight.shadow.camera.top = 20;
+    dirLight.shadow.camera.bottom = -20;
     scene.add(dirLight);
 
     // Dynamic light underneath
-    const underLight = new THREE.PointLight(isBridge ? 0x6366f1 : 0xff3b00, isBridge ? 2.5 : 2.5, 60);
+    const underLight = new THREE.PointLight(
+      isBridge ? 0x6366f1 : (isBomb ? 0xf59e0b : 0xff3b00),
+      isBridge ? 2.5 : (isBomb ? 2.0 : 2.5),
+      60
+    );
     underLight.position.set(0, -3.5, 0);
     scene.add(underLight);
 
@@ -188,6 +215,13 @@ export default function RobloxArena3D({
     let trophyGroup: THREE.Group | null = null;
     let lavaMesh: THREE.Mesh | null = null;
 
+    // Bomb Tag Specific References
+    let bombGroup: THREE.Group | null = null;
+    let bombCoreMesh: THREE.Mesh | null = null;
+    let bombLight: THREE.PointLight | null = null;
+    let bombFloorRing: THREE.Mesh | null = null;
+    let explosionFireball: THREE.Mesh | null = null;
+
     // Helper: Texture generator for Answer Panels
     const createPanelTexture = (shape: string, label: string, hexColor: string, optionText: string, isGlass: boolean) => {
       const canvas = document.createElement('canvas');
@@ -196,11 +230,9 @@ export default function RobloxArena3D({
       const ctx = canvas.getContext('2d');
       if (ctx) {
         if (isGlass) {
-          // Semi-translucent glass pattern with neon gradient
           ctx.fillStyle = hexColor;
           ctx.fillRect(0, 0, 512, 512);
 
-          // Glass shine highlight
           const grad = ctx.createLinearGradient(0, 0, 512, 512);
           grad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
           grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.1)');
@@ -209,22 +241,19 @@ export default function RobloxArena3D({
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, 512, 512);
 
-          // Neon Border
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 16;
           ctx.strokeRect(16, 16, 480, 480);
         } else {
-          // Solid tile
           ctx.fillStyle = hexColor;
           ctx.fillRect(0, 0, 512, 512);
-          ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+          ctx.strokeStyle = 'rgba(255,255,255,0.45)';
           ctx.lineWidth = 14;
           ctx.strokeRect(20, 20, 472, 472);
           ctx.fillStyle = 'rgba(0,0,0,0.15)';
           ctx.fillRect(30, 30, 452, 452);
         }
 
-        // Big Shape Symbol
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 140px Arial, sans-serif';
         ctx.textAlign = 'center';
@@ -233,13 +262,11 @@ export default function RobloxArena3D({
         ctx.shadowBlur = 12;
         ctx.fillText(shape, 256, 170);
 
-        // Label
         ctx.font = 'bold 44px Arial, sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.shadowBlur = 8;
         ctx.fillText(label, 256, 265);
 
-        // Option text if available
         if (optionText) {
           ctx.font = 'bold 28px Arial, sans-serif';
           ctx.fillStyle = '#ffffff';
@@ -260,12 +287,181 @@ export default function RobloxArena3D({
       return tex;
     };
 
-    if (isBridge) {
+    if (isBomb) {
       // -------------------------------------------------------------
-      // 3A. GLASS BRIDGE GEOMETRY (Squid Game / Bridge Trivia Mode)
+      // 3A. BOMB TAG ARENA (Hot Potato Trivia Mode)
       // -------------------------------------------------------------
+      // Main Ground Platform: 24x24 arena
+      const floorGeo = new THREE.BoxGeometry(24, 0.8, 24);
+      const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x18181b,
+        roughness: 0.6,
+        metalness: 0.2,
+      });
+      const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+      floorMesh.position.set(0, -0.4, 0);
+      floorMesh.receiveShadow = true;
+      scene.add(floorMesh);
 
-      // Deep Abyss Plane + Cyber Neon Grid
+      // Yellow-Black Hazard Perimeter Bars
+      const hazardColor = 0xeab308;
+      const borderThickness = 0.35;
+      const borderHeight = 0.45;
+      const borderMat = new THREE.MeshStandardMaterial({ color: hazardColor, roughness: 0.4, metalness: 0.3 });
+
+      // North & South borders
+      [-12, 12].forEach(bz => {
+        const bGeo = new THREE.BoxGeometry(24.4, borderHeight, borderThickness);
+        const bMesh = new THREE.Mesh(bGeo, borderMat);
+        bMesh.position.set(0, borderHeight / 2, bz);
+        scene.add(bMesh);
+      });
+      // East & West borders
+      [-12, 12].forEach(bx => {
+        const bGeo = new THREE.BoxGeometry(borderThickness, borderHeight, 24.4);
+        const bMesh = new THREE.Mesh(bGeo, borderMat);
+        bMesh.position.set(bx, borderHeight / 2, 0);
+        scene.add(bMesh);
+      });
+
+      // Central estafet area grid circle / ring
+      const ringHelper = new THREE.GridHelper(10, 10, 0xf59e0b, 0x3f3f46);
+      ringHelper.position.y = 0.02;
+      scene.add(ringHelper);
+
+      // Center decorative warning emblem
+      const emblemCanvas = document.createElement('canvas');
+      emblemCanvas.width = 256;
+      emblemCanvas.height = 256;
+      const ectx = emblemCanvas.getContext('2d');
+      if (ectx) {
+        ectx.fillStyle = '#18181b';
+        ectx.fillRect(0, 0, 256, 256);
+        ectx.strokeStyle = '#eab308';
+        ectx.lineWidth = 10;
+        ectx.strokeRect(15, 15, 226, 226);
+        ectx.font = 'bold 54px Arial, sans-serif';
+        ectx.fillStyle = '#ef4444';
+        ectx.textAlign = 'center';
+        ectx.fillText('💣', 128, 110);
+        ectx.font = 'bold 24px Arial, sans-serif';
+        ectx.fillStyle = '#facc15';
+        ectx.fillText('BOMB TAG', 128, 165);
+        ectx.font = 'bold 16px Arial, sans-serif';
+        ectx.fillStyle = '#94a3b8';
+        ectx.fillText('ESTAFET ZONE', 128, 200);
+      }
+      const emblemTex = new THREE.CanvasTexture(emblemCanvas);
+      canvasTextures.push(emblemTex);
+      const emblemGeo = new THREE.PlaneGeometry(4.2, 4.2);
+      const emblemMat = new THREE.MeshBasicMaterial({ map: emblemTex, transparent: true, opacity: 0.85 });
+      const emblemMesh = new THREE.Mesh(emblemGeo, emblemMat);
+      emblemMesh.rotation.x = -Math.PI / 2;
+      emblemMesh.position.set(0, 0.03, 0);
+      scene.add(emblemMesh);
+
+      // 4 Elevated Corner Answer Pads
+      QUADRANT_CONFIGS.forEach((q, idx) => {
+        const padGeo = new THREE.BoxGeometry(6.6, 0.45, 6.6);
+        const currentOpt = options[idx] || '';
+        const padTex = createPanelTexture(q.shape, q.label, q.hex, currentOpt, false);
+
+        const padBaseMat = new THREE.MeshStandardMaterial({
+          color: q.color,
+          roughness: 0.4,
+          metalness: 0.3,
+        });
+
+        const padTopMat = new THREE.MeshBasicMaterial({
+          map: padTex,
+        });
+
+        const materials = [
+          padBaseMat, padBaseMat, padTopMat, padBaseMat, padBaseMat, padBaseMat
+        ];
+
+        const padMesh = new THREE.Mesh(padGeo, materials);
+        padMesh.position.set(q.bombX, 0.12, q.bombZ);
+        padMesh.castShadow = true;
+        padMesh.receiveShadow = true;
+        scene.add(padMesh);
+        interactiveMeshes.push(padMesh);
+
+        // Corner beacon light
+        const padLight = new THREE.PointLight(q.color, 1.2, 8);
+        padLight.position.set(q.bombX, 1.2, q.bombZ);
+        scene.add(padLight);
+      });
+
+      // 3D Cartoon Bomb Group
+      bombGroup = new THREE.Group();
+      bombGroup.visible = false;
+
+      // Metallic black sphere
+      const bombMat = new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.25,
+        metalness: 0.85,
+      });
+      bombCoreMesh = new THREE.Mesh(new THREE.SphereGeometry(0.46, 20, 20), bombMat);
+      bombCoreMesh.castShadow = true;
+      bombGroup.add(bombCoreMesh);
+
+      // Fuse cylinder
+      const fuseGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.26, 8);
+      const fuseMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
+      const fuseMesh = new THREE.Mesh(fuseGeo, fuseMat);
+      fuseMesh.position.set(0, 0.52, 0);
+      bombGroup.add(fuseMesh);
+
+      // Spark sphere (emissive flame)
+      const sparkGeo = new THREE.SphereGeometry(0.12, 10, 10);
+      const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+      const sparkMesh = new THREE.Mesh(sparkGeo, sparkMat);
+      sparkMesh.position.set(0, 0.68, 0);
+      bombGroup.add(sparkMesh);
+
+      // Bomb Red Flashing PointLight
+      bombLight = new THREE.PointLight(0xef4444, 2.5, 6);
+      bombLight.position.set(0, 0.6, 0);
+      bombGroup.add(bombLight);
+
+      scene.add(bombGroup);
+
+      // Bomb Floor Danger Ring (Under the feet of the bomb holder)
+      const ringGeo = new THREE.RingGeometry(0.85, 1.2, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xef4444,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+      });
+      bombFloorRing = new THREE.Mesh(ringGeo, ringMat);
+      bombFloorRing.rotation.x = -Math.PI / 2;
+      bombFloorRing.position.set(0, 0.04, 0);
+      bombFloorRing.visible = false;
+      scene.add(bombFloorRing);
+
+      // Explosion Fireball (Hidden until REVIEW phase explosion)
+      const fireGeo = new THREE.SphereGeometry(2.4, 24, 24);
+      const fireMat = new THREE.MeshStandardMaterial({
+        color: 0xff3b00,
+        emissive: 0xff2200,
+        emissiveIntensity: 1.6,
+        roughness: 0.2,
+        transparent: true,
+        opacity: 0.92,
+      });
+      explosionFireball = new THREE.Mesh(fireGeo, fireMat);
+      explosionFireball.position.set(0, 1.5, 0);
+      explosionFireball.scale.set(0.01, 0.01, 0.01);
+      explosionFireball.visible = false;
+      scene.add(explosionFireball);
+
+    } else if (isBridge) {
+      // -------------------------------------------------------------
+      // 3B. GLASS BRIDGE GEOMETRY (Squid Game / Bridge Trivia Mode)
+      // -------------------------------------------------------------
       const abyssGeo = new THREE.PlaneGeometry(120, 120);
       const abyssMat = new THREE.MeshBasicMaterial({ color: 0x050811 });
       const abyssMesh = new THREE.Mesh(abyssGeo, abyssMat);
@@ -277,7 +473,7 @@ export default function RobloxArena3D({
       gridHelper.position.y = -8.2;
       scene.add(gridHelper);
 
-      // Start Platform (Tebing Awal di z = 7.2)
+      // Start Platform
       const startPlatformGeo = new THREE.BoxGeometry(20, 0.8, 4.5);
       const startPlatformMat = new THREE.MeshStandardMaterial({
         color: 0x1e293b,
@@ -296,10 +492,10 @@ export default function RobloxArena3D({
       startNeon.position.set(0, 0.42, 5.0);
       scene.add(startNeon);
 
-      // Goal Platform (Tebing Finish di z = -8.2)
+      // Goal Platform
       const goalPlatformGeo = new THREE.BoxGeometry(20, 0.8, 4.5);
       const goalPlatformMat = new THREE.MeshStandardMaterial({
-        color: 0x064e3b, // emerald dark
+        color: 0x064e3b,
         roughness: 0.35,
         metalness: 0.4,
       });
@@ -315,10 +511,9 @@ export default function RobloxArena3D({
       goalNeon.position.set(0, 0.42, -6.0);
       scene.add(goalNeon);
 
-      // 3D Gold Trophy at Goal Platform (z = -8.2)
+      // 3D Gold Trophy
       trophyGroup = new THREE.Group();
       trophyGroup.position.set(0, 1.4, -8.2);
-
       const goldMat = new THREE.MeshStandardMaterial({
         color: 0xfacc15,
         emissive: 0xca8a04,
@@ -327,22 +522,18 @@ export default function RobloxArena3D({
         metalness: 0.85,
       });
 
-      // Trophy Base
       const tBase = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 0.35, 16), goldMat);
       tBase.position.y = -0.55;
       trophyGroup.add(tBase);
 
-      // Trophy Stem
       const tStem = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 0.5, 16), goldMat);
       tStem.position.y = -0.15;
       trophyGroup.add(tStem);
 
-      // Trophy Cup
       const tCup = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.4, 0.9, 16), goldMat);
       tCup.position.y = 0.45;
       trophyGroup.add(tCup);
 
-      // Trophy Handles (Toruses)
       const handleGeo = new THREE.TorusGeometry(0.35, 0.07, 10, 16, Math.PI);
       const tHandleL = new THREE.Mesh(handleGeo, goldMat);
       tHandleL.position.set(-0.7, 0.45, 0);
@@ -354,14 +545,9 @@ export default function RobloxArena3D({
       tHandleR.rotation.z = -Math.PI / 2;
       trophyGroup.add(tHandleR);
 
-      // Trophy Point Light
-      const trophyLight = new THREE.PointLight(0xfef08a, 1.8, 8);
-      trophyLight.position.set(0, 1.0, 0);
-      trophyGroup.add(trophyLight);
-
       scene.add(trophyGroup);
 
-      // Neon Rails (Left & Right Suspension Cables)
+      // Neon Rails
       const railGeo = new THREE.BoxGeometry(0.3, 0.3, 19.5);
       const railMatL = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
       const railMeshL = new THREE.Mesh(railGeo, railMatL);
@@ -386,7 +572,7 @@ export default function RobloxArena3D({
         scene.add(postR);
       });
 
-      // 4 Main Interactive Glass Panels at z = 0
+      // 4 Main Interactive Glass Panels
       QUADRANT_CONFIGS.forEach((q, idx) => {
         const panelGeo = new THREE.BoxGeometry(4.2, 0.32, 6.0);
         const currentOpt = options[idx] || '';
@@ -406,7 +592,6 @@ export default function RobloxArena3D({
           opacity: 0.94,
         });
 
-        // Multi-material for box [right, left, top, bottom, front, back]
         const materials = [
           glassMat, glassMat, topMat, glassMat, glassMat, glassMat
         ];
@@ -418,7 +603,6 @@ export default function RobloxArena3D({
         scene.add(panelMesh);
         interactiveMeshes.push(panelMesh);
 
-        // Metallic Frame beneath the glass
         const frameGeo = new THREE.BoxGeometry(4.35, 0.12, 6.15);
         const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
         const frameMesh = new THREE.Mesh(frameGeo, frameMat);
@@ -426,7 +610,7 @@ export default function RobloxArena3D({
         panelMesh.add(frameMesh);
       });
 
-      // 4 Decorative Extension Glass Panels at z = -4.6 (bridging to Goal Platform)
+      // 4 Decorative Extension Glass Panels
       QUADRANT_CONFIGS.forEach((q) => {
         const extGeo = new THREE.BoxGeometry(4.2, 0.25, 2.8);
         const extMat = new THREE.MeshStandardMaterial({
@@ -443,10 +627,8 @@ export default function RobloxArena3D({
 
     } else {
       // -------------------------------------------------------------
-      // 3B. LAVA TILES ARENA (Classic Answer or Fall Mode)
+      // 3C. LAVA TILES ARENA (Classic Answer or Fall Mode)
       // -------------------------------------------------------------
-
-      // Ocean of Lava
       const lavaGeo = new THREE.PlaneGeometry(120, 120, 16, 16);
       const lavaMat = new THREE.MeshStandardMaterial({
         color: 0xff3300,
@@ -472,7 +654,6 @@ export default function RobloxArena3D({
       centerPad.receiveShadow = true;
       scene.add(centerPad);
 
-      // Center icon canvas texture
       const centerCanvas = document.createElement('canvas');
       centerCanvas.width = 256;
       centerCanvas.height = 256;
@@ -492,6 +673,7 @@ export default function RobloxArena3D({
         cctx.fillText('Lava Arena', 128, 165);
       }
       const centerTex = new THREE.CanvasTexture(centerCanvas);
+      canvasTextures.push(centerTex);
       const centerTopMat = new THREE.MeshBasicMaterial({ map: centerTex });
       centerPad.material = [
         centerPadMat, centerPadMat, centerTopMat, centerPadMat, centerPadMat, centerPadMat
@@ -555,18 +737,17 @@ export default function RobloxArena3D({
         fctx.fillStyle = '#facc15';
         fctx.fillRect(0, 0, 128, 128);
         fctx.fillStyle = '#1e1b4b';
-        // 2 round eyes
         fctx.beginPath();
         fctx.arc(40, 50, 8, 0, Math.PI * 2);
         fctx.arc(88, 50, 8, 0, Math.PI * 2);
         fctx.fill();
-        // smiling mouth
         fctx.beginPath();
         fctx.arc(64, 75, 20, 0, Math.PI);
         fctx.lineWidth = 5;
         fctx.stroke();
       }
       const faceTex = new THREE.CanvasTexture(faceCanvas);
+      canvasTextures.push(faceTex);
       const faceMat = new THREE.MeshBasicMaterial({ map: faceTex });
       const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.68), faceMat);
       faceMesh.position.set(0, 1.95, 0.355);
@@ -621,6 +802,7 @@ export default function RobloxArena3D({
         tctx.fillText(`${avatarEmoji} ${nameText}`, 192, 48);
       }
       const tagTex = new THREE.CanvasTexture(tagCanvas);
+      canvasTextures.push(tagTex);
       const tagMat = new THREE.SpriteMaterial({ map: tagTex, depthTest: false });
       const tagSprite = new THREE.Sprite(tagMat);
       tagSprite.position.set(0, 2.8, 0);
@@ -638,6 +820,13 @@ export default function RobloxArena3D({
 
       return group;
     };
+
+    // If Bomb Tag mode: add RoboTarget bot character to scene
+    let botGroup: THREE.Group | null = null;
+    if (isBomb) {
+      botGroup = createRobloxCharacter('RoboTarget', '🤖', 0x06b6d4);
+      scene.add(botGroup);
+    }
 
     // 7. Input Event Listeners
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -702,6 +891,9 @@ export default function RobloxArena3D({
       if (isBridge) {
         localPosRef.current.x = Math.max(-9.6, Math.min(9.6, localPosRef.current.x + dx));
         localPosRef.current.z = Math.max(-8.5, Math.min(8.5, localPosRef.current.z + dz));
+      } else if (isBomb) {
+        localPosRef.current.x = Math.max(-11.2, Math.min(11.2, localPosRef.current.x + dx));
+        localPosRef.current.z = Math.max(-11.2, Math.min(11.2, localPosRef.current.z + dz));
       } else {
         localPosRef.current.x = Math.max(-10.8, Math.min(10.8, localPosRef.current.x + dx));
         localPosRef.current.z = Math.max(-10.8, Math.min(10.8, localPosRef.current.z + dz));
@@ -729,8 +921,15 @@ export default function RobloxArena3D({
           else if (lx < 4.8) detectedZone = 2; // ● Kuning
           else detectedZone = 3; // ■ Hijau
         } else {
-          detectedZone = null; // Start Platform (z > 4.2) or Goal Platform (z < -3.5)
+          detectedZone = null;
         }
+      } else if (isBomb) {
+        // Bomb Tag: 4 corner elevated pads
+        if (lx < -4.0 && lz < -4.0) detectedZone = 0; // ▲ Merah
+        else if (lx > 4.0 && lz < -4.0) detectedZone = 1; // ◆ Biru
+        else if (lx < -4.0 && lz > 4.0) detectedZone = 2; // ● Kuning
+        else if (lx > 4.0 && lz > 4.0) detectedZone = 3; // ■ Hijau
+        else detectedZone = null; // Central estafet area
       } else {
         // Lava Tiles: 4 quadrants
         if (lx < -1.8 && lz < -1.8) detectedZone = 0; // ▲ Merah
@@ -756,6 +955,23 @@ export default function RobloxArena3D({
         }
       }
 
+      // Update RoboTarget Bot in Bomb Tag
+      let botX = 0;
+      let botZ = 0;
+      if (isBomb && botGroup) {
+        botX = Math.sin(time * 1.5) * 3.5;
+        botZ = Math.cos(time * 1.5) * 3.5;
+        botGroup.position.set(botX, 0.5, botZ);
+
+        // Animate Bot Limbs
+        const { leftArm, rightArm, leftLeg, rightLeg } = botGroup.userData;
+        const botSwing = Math.sin(time * 10) * 0.6;
+        leftArm.rotation.x = botSwing;
+        rightArm.rotation.x = -botSwing;
+        leftLeg.rotation.x = -botSwing;
+        rightLeg.rotation.x = botSwing;
+      }
+
       // Sync Roblox character objects
       const currentPlayers = playersRef.current;
       const activeIds = new Set<string>();
@@ -773,7 +989,6 @@ export default function RobloxArena3D({
         const hostChar = characterGroups.get(previewId)!;
         hostChar.position.set(localPosRef.current.x, localPosRef.current.y, localPosRef.current.z);
 
-        // Animate limbs if moving
         const { leftArm, rightArm, leftLeg, rightLeg } = hostChar.userData;
         if (moved) {
           const swing = Math.sin(time * 14) * 0.7;
@@ -806,21 +1021,35 @@ export default function RobloxArena3D({
         let targetZ = isLocal ? localPosRef.current.z : (typeof p.z === 'number' ? p.z : (isBridge ? 7.2 : 0));
         let targetY = isLocal ? localPosRef.current.y : (p.jumping ? 1.1 : 0.5);
 
-        // Handle "Answer or Fall / Glass Shatter" in REVIEW phase
-        if (phaseRef.current === 'REVIEW' && typeof correctIndexRef.current === 'number') {
-          const correctIdx = correctIndexRef.current;
-          const playerZone = isLocal ? detectedZone : p.currentAnswer;
-          const isWinner = playerZone === correctIdx;
+        // Handle "Review Phase Animations"
+        if (phaseRef.current === 'REVIEW') {
+          if (isBomb) {
+            // Bomb Tag Review: exploded bomb holder flies up
+            const isExploded = (explodedPlayerIdRef.current && p.id === explodedPlayerIdRef.current) || p.exploded;
+            if (isExploded) {
+              targetY = Math.min(18.0, char.position.y + 16.0 * delta);
+              char.rotation.x += 16 * delta;
+              char.rotation.y += 14 * delta;
+            } else {
+              // Survivor celebration bounce!
+              targetY = 0.55 + Math.abs(Math.sin(time * 10)) * 0.75;
+              char.rotation.x = 0;
+              char.rotation.y = 0;
+            }
+          } else if (typeof correctIndexRef.current === 'number') {
+            // Glass Bridge or Lava Tiles Review
+            const correctIdx = correctIndexRef.current;
+            const playerZone = isLocal ? detectedZone : p.currentAnswer;
+            const isWinner = playerZone === correctIdx;
 
-          if (isWinner) {
-            // Victorious jumping on solid platform!
-            targetY = 0.55 + Math.abs(Math.sin(time * 10)) * 0.75;
-          } else {
-            // Sunk into abyss or lava!
-            const dropLimit = isBridge ? -8.0 : -5.0;
-            targetY = Math.max(dropLimit, char.position.y - 5.5 * delta);
-            char.rotation.x += 1.8 * delta;
-            char.rotation.z += 1.4 * delta;
+            if (isWinner) {
+              targetY = 0.55 + Math.abs(Math.sin(time * 10)) * 0.75;
+            } else {
+              const dropLimit = isBridge ? -8.0 : -5.0;
+              targetY = Math.max(dropLimit, char.position.y - 5.5 * delta);
+              char.rotation.x += 1.8 * delta;
+              char.rotation.z += 1.4 * delta;
+            }
           }
         } else {
           char.rotation.x = 0;
@@ -857,26 +1086,82 @@ export default function RobloxArena3D({
         }
       }
 
-      // "Answer or Fall / Glass Shatter" Animation on Answer Panels
-      if (phaseRef.current === 'REVIEW' && typeof correctIndexRef.current === 'number') {
+      // Update Bomb & Explosion in Bomb Tag Mode
+      if (isBomb && bombGroup && bombCoreMesh && bombLight && bombFloorRing) {
+        const curHolder = bombHolderIdRef.current;
+        if (curHolder && phaseRef.current !== 'LOBBY') {
+          bombGroup.visible = true;
+          bombFloorRing.visible = true;
+
+          let holderX = 0;
+          let holderY = 0.5;
+          let holderZ = 0;
+
+          if (curHolder === 'bot_target') {
+            holderX = botX;
+            holderZ = botZ;
+          } else if (curHolder === localPlayerId || (isSoloPreview && curHolder.startsWith('p_'))) {
+            holderX = localPosRef.current.x;
+            holderY = localPosRef.current.y;
+            holderZ = localPosRef.current.z;
+          } else {
+            const holderChar = characterGroups.get(curHolder);
+            if (holderChar) {
+              holderX = holderChar.position.x;
+              holderY = holderChar.position.y;
+              holderZ = holderChar.position.z;
+            }
+          }
+
+          // Float bomb above holder's head with pulsing rhythm
+          const pulse = 1.0 + Math.sin(time * 18) * 0.22;
+          bombCoreMesh.scale.set(pulse, pulse, pulse);
+          bombLight.intensity = 2.0 + Math.sin(time * 18) * 1.5;
+
+          bombGroup.position.set(holderX, holderY + 2.7 + Math.sin(time * 6) * 0.15, holderZ);
+          bombGroup.rotation.y += 0.04;
+
+          // Danger ring under feet
+          bombFloorRing.position.set(holderX, 0.05, holderZ);
+          bombFloorRing.rotation.z += delta * 2;
+
+          // Review explosion fireball
+          if (explosionFireball) {
+            if (phaseRef.current === 'REVIEW') {
+              explosionFireball.visible = true;
+              explosionFireball.position.set(holderX, 1.6, holderZ);
+              if (explosionFireball.scale.x < 3.2) {
+                explosionFireball.scale.addScalar(delta * 12);
+              }
+            } else {
+              explosionFireball.visible = false;
+              explosionFireball.scale.set(0.01, 0.01, 0.01);
+            }
+          }
+        } else {
+          bombGroup.visible = false;
+          bombFloorRing.visible = false;
+          if (explosionFireball) explosionFireball.visible = false;
+        }
+      }
+
+      // "Answer or Fall / Glass Shatter" Animation on Answer Panels in non-bomb modes
+      if (!isBomb && phaseRef.current === 'REVIEW' && typeof correctIndexRef.current === 'number') {
         const correct = correctIndexRef.current;
         interactiveMeshes.forEach((mesh, qIdx) => {
           if (qIdx !== correct) {
-            // Shatter and drop down!
             const dropLimit = isBridge ? -14.0 : -10.0;
             const dropSpeed = isBridge ? 12.0 : 9.0;
             mesh.position.y = Math.max(dropLimit, mesh.position.y - dropSpeed * delta);
             mesh.rotation.x += isBridge ? 0.04 : 0.02;
             mesh.rotation.z += isBridge ? 0.03 : 0.02;
           } else {
-            // Winner panel stays solid and elevates slightly
             mesh.position.y = isBridge ? 0.15 : 0.25;
             mesh.rotation.x = 0;
             mesh.rotation.z = 0;
           }
         });
-      } else {
-        // Reset panels to solid ground
+      } else if (!isBomb) {
         interactiveMeshes.forEach((mesh) => {
           mesh.position.y += ((isBridge ? 0.05 : 0) - mesh.position.y) * 0.2;
           mesh.rotation.x += (0 - mesh.rotation.x) * 0.2;
@@ -914,6 +1199,12 @@ export default function RobloxArena3D({
     };
   }, [arenaMode]);
 
+  const isLocalHoldingBomb = isBombTag && (
+    bombHolderId === localPlayerId ||
+    (isHost && (!players.length || bombHolderId === 'preview_host')) ||
+    (!localPlayerId && bombHolderId && !players.find(p => p.id === bombHolderId))
+  );
+
   return (
     <div className="relative w-full rounded-3xl overflow-hidden border-2 border-purple-500/40 shadow-2xl bg-slate-950 select-none">
       {/* 3D WebGL Canvas Container */}
@@ -922,7 +1213,7 @@ export default function RobloxArena3D({
       {/* Mode Indicator Badge */}
       <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none z-10">
         <span className="bg-slate-900/90 border border-purple-500/40 px-3 py-1 rounded-xl text-xs font-black text-purple-200 shadow-lg backdrop-blur flex items-center gap-1.5">
-          {arenaMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D' : '🌋 Lantai Lava 3D'}
+          {arenaMode === 'bomb_tag' ? '💣 Estafet Bom 3D' : arenaMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D' : '🌋 Lantai Lava 3D'}
         </span>
       </div>
 
@@ -945,11 +1236,28 @@ export default function RobloxArena3D({
         </div>
       )}
 
+      {/* Bomb Tag Dynamic Banner Alert */}
+      {isBombTag && phase === 'QUESTION' && (
+        <div className="absolute top-14 left-3 right-3 flex justify-center pointer-events-none z-20">
+          {isLocalHoldingBomb ? (
+            <div className="bg-red-600/95 border-2 border-yellow-400 text-white px-4 py-1.5 rounded-2xl font-black text-xs sm:text-sm shadow-2xl backdrop-blur animate-bounce flex items-center gap-2">
+              <span className="text-lg">💣🔥</span>
+              <span>KAMU MEMEGANG BOM! Tabrak pemain lain / jawab benar untuk mengoper!</span>
+            </div>
+          ) : (
+            <div className="bg-slate-900/90 border border-emerald-500/60 text-emerald-300 px-4 py-1.5 rounded-2xl font-bold text-xs sm:text-sm shadow-lg backdrop-blur flex items-center gap-2">
+              <span className="text-lg">🛡️</span>
+              <span>STATUS: AMAN! Jaga jarak dari pemegang bom & pilih petak jawaban!</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Current Standing Zone Indicator */}
-      <div className="absolute top-14 left-3 pointer-events-none z-10">
+      <div className={`absolute left-3 pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24 sm:top-24' : 'top-14'}`}>
         {currentStandingZone !== null && QUADRANT_CONFIGS[currentStandingZone] ? (
           <div className="bg-slate-900/90 border border-emerald-500/50 px-3 py-1 rounded-xl text-xs font-bold text-emerald-300 shadow-md backdrop-blur flex items-center gap-1.5 animate-bounce-short">
-            <span>📍 Jalur Dipilih:</span>
+            <span>📍 Petak Dipilih:</span>
             <span className="text-white bg-black/40 px-2 py-0.5 rounded">
               {QUADRANT_CONFIGS[currentStandingZone].shape} {QUADRANT_CONFIGS[currentStandingZone].label}
             </span>
@@ -957,13 +1265,17 @@ export default function RobloxArena3D({
           </div>
         ) : (
           <div className="bg-slate-900/80 border border-slate-700 px-3 py-1 rounded-xl text-[11px] font-bold text-gray-400 shadow-md backdrop-blur">
-            {arenaMode === 'glass_bridge' ? '📍 Tebing Awal (Zona Netral)' : '📍 Zona Netral (Tengah)'}
+            {arenaMode === 'glass_bridge'
+              ? '📍 Tebing Awal (Zona Netral)'
+              : arenaMode === 'bomb_tag'
+              ? '📍 Arena Tengah (Zona Estafet Bom)'
+              : '📍 Zona Netral (Tengah)'}
           </div>
         )}
       </div>
 
       {/* Keyboard movement hint */}
-      <div className="absolute top-14 right-3 hidden md:flex items-center gap-1 bg-black/50 px-2.5 py-1 rounded-lg text-[10px] text-gray-300 border border-white/10 pointer-events-none z-10">
+      <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-black/50 px-2.5 py-1 rounded-lg text-[10px] text-gray-300 border border-white/10 pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24' : 'top-14'}`}>
         <span>Gunakan</span>
         <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">W</kbd>
         <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">A</kbd>
@@ -989,7 +1301,7 @@ export default function RobloxArena3D({
                   idx === 2 ? 'bg-amber-600 hover:bg-amber-500' :
                   'bg-emerald-600 hover:bg-emerald-500'
                 } ${isSelected ? 'ring-4 ring-white scale-105 shadow-2xl' : 'opacity-90'}`}
-                title={`Lari ke jalur ${q.label}`}
+                title={`Lari ke petak ${q.label}`}
               >
                 <span>{q.shape}</span>
                 <span className="hidden sm:inline text-xs">{q.label}</span>

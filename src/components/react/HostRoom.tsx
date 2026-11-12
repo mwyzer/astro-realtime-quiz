@@ -56,7 +56,10 @@ export default function HostRoom() {
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [gameMode, setGameMode] = useState<GameMode>('glass_bridge');
+  const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
+  const [bombHolderId, setBombHolderId] = useState<string | null>(null);
+  const [explodedPlayerId, setExplodedPlayerId] = useState<string | null>(null);
+  const [bombToast, setBombToast] = useState<{ text: string; id: number } | null>(null);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [powerupToast, setPowerupToast] = useState<{ text: string; id: number } | null>(null);
 
@@ -178,6 +181,8 @@ export default function HostRoom() {
         setPhase('QUESTION');
         setAnsweredCount(0);
         setAnswerStats(null);
+        setBombHolderId(msg.bombHolderId || null);
+        setExplodedPlayerId(null);
         setCurrentQuestion({
           ...msg.question,
           questionIndex: msg.questionIndex,
@@ -185,6 +190,22 @@ export default function HostRoom() {
         });
         setTimeLeft(msg.question.timeLimit || 15);
         break;
+
+      case 'BOMB_PASSED': {
+        setBombHolderId(msg.bombHolderId);
+        const reasonDesc = msg.reason === 'correct_answer' 
+          ? 'jawaban benar 🎯' 
+          : msg.reason === 'physical_tag' 
+          ? 'tabrakan/sentuhan fisik 💥' 
+          : 'operan bot 🤖';
+        setBombToast({
+          text: `💣 Estafet Bom: ${msg.fromName} ➔ ${msg.toName} (${reasonDesc})`,
+          id: Date.now()
+        });
+        sound.playPop();
+        setTimeout(() => setBombToast(null), 3500);
+        break;
+      }
 
       case 'TIME_TICK':
         setTimeLeft(msg.timeLeft);
@@ -196,6 +217,7 @@ export default function HostRoom() {
       case 'QUESTION_END':
         setPhase('REVIEW');
         setAnswerStats(msg.stats);
+        if (msg.explodedPlayerId) setExplodedPlayerId(msg.explodedPlayerId);
         if (msg.leaderboard) setPlayers(msg.leaderboard);
         sound.playCorrect();
         break;
@@ -268,6 +290,7 @@ export default function HostRoom() {
 
   const renderModeSelector = (compact = false) => {
     const modes: { id: GameMode; label: string; icon: string; desc: string }[] = [
+      { id: 'bomb_tag', label: 'Estafet Bom 3D', icon: '💣', desc: 'Oper bom waktu sebelum meledak! Survivor bonus +300' },
       { id: 'glass_bridge', label: 'Jembatan Kaca 3D', icon: '🌉', desc: 'Jalur kaca transparan ke tebing piala finish' },
       { id: 'lava_tiles', label: 'Lantai Lava 3D', icon: '🌋', desc: '4 Kuadran lantai runtuh ke lautan lava' },
       { id: 'classic', label: 'Mode Klasik', icon: '📋', desc: 'Tampilan tombol kuis 2D minimalis' },
@@ -446,13 +469,23 @@ export default function HostRoom() {
   };
 
   const renderPowerupToast = () => {
-    if (!powerupToast) return null;
     return (
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
-        <div className="bg-gradient-to-r from-amber-500 to-purple-600 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
-          <span>{powerupToast.text}</span>
-        </div>
-      </div>
+      <>
+        {powerupToast && (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
+            <div className="bg-gradient-to-r from-amber-500 to-purple-600 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+              <span>{powerupToast.text}</span>
+            </div>
+          </div>
+        )}
+        {bombToast && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
+            <div className="bg-gradient-to-r from-red-600 to-amber-500 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+              <span>{bombToast.text}</span>
+            </div>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -635,7 +668,7 @@ export default function HostRoom() {
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
-                    {gameMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D (Lobby Preview)' : '🌋 Lantai Lava 3D (Lobby Preview)'}
+                    {gameMode === 'bomb_tag' ? '💣 Estafet Bom 3D (Lobby Preview)' : gameMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D (Lobby Preview)' : '🌋 Lantai Lava 3D (Lobby Preview)'}
                   </span>
                   <span className="text-xs text-purple-300 bg-purple-500/20 px-2.5 py-0.5 rounded-full border border-purple-500/30 hidden sm:inline">
                     Host & Pemain dapat bergerak dengan WASD / Tombol Arah
@@ -644,7 +677,9 @@ export default function HostRoom() {
               </div>
               <RobloxArena3D
                 phase="LOBBY"
-                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
+                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                bombHolderId={bombHolderId}
+                explodedPlayerId={explodedPlayerId}
                 isHost={true}
                 players={players}
               />
@@ -747,10 +782,10 @@ export default function HostRoom() {
                   type="button"
                   onClick={skipTimer}
                   className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-extrabold text-xs rounded-xl shadow-lg border border-red-400/40 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                  title="Langsung akhiri waktu dan runtuhkan lantai/kaca yang salah"
+                  title={gameMode === 'bomb_tag' ? 'Ledakkan bom sekarang!' : 'Langsung akhiri waktu'}
                 >
                   <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>{gameMode === 'glass_bridge' ? 'Pecahkan Kaca' : 'Runtuhkan Lantai'}</span>
+                  <span>{gameMode === 'bomb_tag' ? '💥 Ledakkan Bom Sekarang' : gameMode === 'glass_bridge' ? 'Pecahkan Kaca' : 'Runtuhkan Lantai'}</span>
                 </button>
               )}
 
@@ -785,7 +820,9 @@ export default function HostRoom() {
             <div className="mb-6 space-y-4">
               <RobloxArena3D
                 phase={phase}
-                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
+                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                bombHolderId={bombHolderId}
+                explodedPlayerId={explodedPlayerId}
                 isHost={true}
                 players={players}
                 correctIndex={isReview ? currentQuestion.correctIndex : null}

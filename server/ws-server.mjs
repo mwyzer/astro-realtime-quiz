@@ -227,6 +227,33 @@ function broadcastPlayersPositions(room) {
   });
 }
 
+function passBombToNext(room, fromPlayer, reason) {
+  let targetId = 'bot_target';
+  let toName = '🤖 RoboTarget';
+
+  const otherPlayers = Array.from(room.players.values()).filter(p => p.id !== fromPlayer.id);
+  if (otherPlayers.length > 0) {
+    const uncommitted = otherPlayers.filter(p => p.currentAnswer === null);
+    const chosen = uncommitted.length > 0
+      ? uncommitted[Math.floor(Math.random() * uncommitted.length)]
+      : otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
+    targetId = chosen.id;
+    toName = chosen.name;
+  }
+
+  room.bombHolderId = targetId;
+  room.lastBombPassTime = Date.now();
+
+  broadcastToRoom(room, {
+    type: 'BOMB_PASSED',
+    bombHolderId: room.bombHolderId,
+    fromName: fromPlayer.name,
+    toName,
+    reason
+  });
+  console.log(`[WS] Bomb passed in room ${room.code}: ${fromPlayer.name} -> ${toName} (${reason})`);
+}
+
 function endCurrentQuestion(room) {
   if (room.timer) {
     clearInterval(room.timer);
@@ -237,23 +264,38 @@ function endCurrentQuestion(room) {
   const q = room.quiz.questions[room.currentQuestionIndex];
   const optionCounts = [0, 0, 0, 0];
   let totalAnswers = 0;
+  const isBombTag = room.gameMode === 'bomb_tag';
 
   for (const player of room.players.values()) {
     const isCorrect = player.currentAnswer === q.correctIndex;
+    const isBombHolder = isBombTag && player.id === room.bombHolderId;
     let earned = 0;
 
-    if (isCorrect) {
+    if (isBombHolder) {
+      // KABOOM! Pemegang bom saat waktu habis meledak!
+      earned = 0;
+      player.streak = 0;
+      player.lastExploded = true;
+    } else if (isCorrect) {
       player.streak = (player.streak || 0) + 1;
       const timeLimitMs = (q.timeLimit || 15) * 1000;
       const timeSpent = Math.min(player.answerTimeMs || timeLimitMs, timeLimitMs);
       const speedRatio = Math.max(0, 1 - (timeSpent / timeLimitMs));
       earned = Math.round(500 + (500 * speedRatio) + (Math.min(player.streak, 5) * 50));
+      
+      // Bomb Survivor Bonus jika selamat tanpa bom!
+      if (isBombTag) {
+        earned += 300;
+      }
+
       if (player.activeDoublePoints) {
         earned = earned * 2;
       }
       player.score += earned;
+      player.lastExploded = false;
     } else {
       player.streak = 0;
+      player.lastExploded = false;
     }
 
     if (player.currentAnswer !== null && player.currentAnswer >= 0 && player.currentAnswer < 4) {
@@ -276,7 +318,8 @@ function endCurrentQuestion(room) {
       totalScore: player.score,
       streak: player.streak,
       rank: rankInfo ? rankInfo.rank : 1,
-      correctIndex: q.correctIndex
+      correctIndex: q.correctIndex,
+      exploded: !!player.lastExploded
     });
   }
 
@@ -284,6 +327,7 @@ function endCurrentQuestion(room) {
     type: 'QUESTION_END',
     correctIndex: q.correctIndex,
     explanation: q.explanation || '',
+    explodedPlayerId: isBombTag ? room.bombHolderId : null,
     stats: {
       optionCounts,
       totalAnswers
@@ -301,12 +345,35 @@ function startQuestion(room, index) {
   room.timeLeft = timeLimit;
   room.questionStartTime = Date.now();
 
+  // Initialize Bomb Holder for Bomb Tag Mode
+  if (room.gameMode === 'bomb_tag') {
+    const pArray = Array.from(room.players.values());
+    if (pArray.length > 0) {
+      const luckyPlayer = pArray[Math.floor(Math.random() * pArray.length)];
+      room.bombHolderId = luckyPlayer.id;
+    } else {
+      room.bombHolderId = 'bot_target';
+    }
+    room.lastBombPassTime = Date.now();
+  } else {
+    room.bombHolderId = null;
+  }
+
   for (const p of room.players.values()) {
     p.currentAnswer = null;
     p.answerTimeMs = null;
     p.activeDoublePoints = false;
-    p.x = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
-    p.z = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+    p.lastExploded = false;
+    if (room.gameMode === 'glass_bridge') {
+      p.x = (Math.random() - 0.5) * 4;
+      p.z = 7.2;
+    } else if (room.gameMode === 'bomb_tag') {
+      p.x = (Math.random() - 0.5) * 6;
+      p.z = (Math.random() - 0.5) * 6;
+    } else {
+      p.x = (Math.random() - 0.5) * 2;
+      p.z = (Math.random() - 0.5) * 2;
+    }
     p.jumping = false;
   }
 
@@ -314,6 +381,7 @@ function startQuestion(room, index) {
     type: 'QUESTION_START',
     questionIndex: index,
     totalQuestions: room.quiz.questions.length,
+    bombHolderId: room.bombHolderId,
     question: {
       id: q.id,
       text: q.text,
@@ -328,6 +396,7 @@ function startQuestion(room, index) {
       type: 'QUESTION_START',
       questionIndex: index,
       totalQuestions: room.quiz.questions.length,
+      bombHolderId: room.bombHolderId,
       question: {
         id: q.id,
         text: q.text,
@@ -380,13 +449,15 @@ wss.on('connection', (ws) => {
           // Find quiz in disk/memory quizzes
           const selectedQuiz = quizzes.find(q => q.id === data.quizId) || quizzes[0];
           const code = generateRoomCode();
-          const gameMode = ['glass_bridge', 'lava_tiles', 'classic'].includes(data.gameMode) ? data.gameMode : 'glass_bridge';
+          const gameMode = ['bomb_tag', 'glass_bridge', 'lava_tiles', 'classic'].includes(data.gameMode) ? data.gameMode : 'bomb_tag';
           
           const room = {
             code,
             hostWs: ws,
             quiz: selectedQuiz,
             gameMode,
+            bombHolderId: null,
+            lastBombPassTime: 0,
             phase: 'LOBBY',
             currentQuestionIndex: 0,
             timer: null,
@@ -431,8 +502,15 @@ wss.on('connection', (ws) => {
           }
 
           const playerId = 'p_' + Math.random().toString(36).substring(2, 9);
-          const spawnX = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
-          const spawnZ = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+          let spawnX = (Math.random() - 0.5) * 2;
+          let spawnZ = (Math.random() - 0.5) * 2;
+          if (room.gameMode === 'glass_bridge') {
+            spawnX = (Math.random() - 0.5) * 4;
+            spawnZ = 7.2;
+          } else if (room.gameMode === 'bomb_tag') {
+            spawnX = (Math.random() - 0.5) * 6;
+            spawnZ = (Math.random() - 0.5) * 6;
+          }
 
           const newPlayer = {
             id: playerId,
@@ -478,12 +556,20 @@ wss.on('connection', (ws) => {
         case 'SET_GAME_MODE': {
           if (!isHost || !boundRoom) return;
           const mode = data.gameMode;
-          if (['glass_bridge', 'lava_tiles', 'classic'].includes(mode)) {
+          if (['bomb_tag', 'glass_bridge', 'lava_tiles', 'classic'].includes(mode)) {
             boundRoom.gameMode = mode;
-            // Reposition players in lobby if changing to glass bridge or lava
+            // Reposition players in lobby according to selected mode
             for (const p of boundRoom.players.values()) {
-              p.x = mode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
-              p.z = mode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+              if (mode === 'glass_bridge') {
+                p.x = (Math.random() - 0.5) * 4;
+                p.z = 7.2;
+              } else if (mode === 'bomb_tag') {
+                p.x = (Math.random() - 0.5) * 6;
+                p.z = (Math.random() - 0.5) * 6;
+              } else {
+                p.x = (Math.random() - 0.5) * 2;
+                p.z = (Math.random() - 0.5) * 2;
+              }
             }
             broadcastToRoom(boundRoom, {
               type: 'GAME_MODE_UPDATED',
@@ -543,6 +629,27 @@ wss.on('connection', (ws) => {
               player.x = glassLanes[answerIndex] + (Math.random() - 0.5) * 0.8;
               player.z = 0 + (Math.random() - 0.5) * 0.8;
             }
+          } else if (room.gameMode === 'bomb_tag') {
+            // Map answer index to 4 corner pads:
+            // 0: ▲ Merah (-7.5, -7.5)
+            // 1: ◆ Biru (7.5, -7.5)
+            // 2: ● Kuning (-7.5, 7.5)
+            // 3: ■ Hijau (7.5, 7.5)
+            const bombPads = [
+              { x: -7.5, z: -7.5 },
+              { x: 7.5, z: -7.5 },
+              { x: -7.5, z: 7.5 },
+              { x: 7.5, z: 7.5 }
+            ];
+            if (bombPads[answerIndex]) {
+              player.x = bombPads[answerIndex].x + (Math.random() - 0.5) * 1.5;
+              player.z = bombPads[answerIndex].z + (Math.random() - 0.5) * 1.5;
+            }
+            // Check if player is holding the bomb and answered correctly!
+            const q = room.quiz.questions[room.currentQuestionIndex];
+            if (player.id === room.bombHolderId && answerIndex === q.correctIndex) {
+              passBombToNext(room, player, 'correct_answer');
+            }
           } else {
             // Map answer index to Roblox 3D color quadrant coords (lava tiles)
             const quadrantCenters = [
@@ -570,6 +677,7 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'EXPLODE_BOMB_NOW':
         case 'FORCE_END_QUESTION':
         case 'SKIP_TIMER': {
           if (!isHost || !boundRoom) return;
@@ -591,7 +699,7 @@ wss.on('connection', (ws) => {
           if (typeof data.z === 'number') player.z = data.z;
           if (typeof data.jumping === 'boolean') player.jumping = data.jumping;
 
-          // If answerIndex is passed from walking into a color quadrant
+          // If answerIndex is passed from walking into a color quadrant / corner pad
           if (room.phase === 'QUESTION') {
             if (typeof data.answerIndex === 'number' && data.answerIndex >= 0 && data.answerIndex <= 3) {
               if (player.currentAnswer !== data.answerIndex) {
@@ -605,6 +713,13 @@ wss.on('connection', (ws) => {
                   answeredCount,
                   totalPlayers: room.players.size
                 });
+
+                if (room.gameMode === 'bomb_tag') {
+                  const q = room.quiz.questions[room.currentQuestionIndex];
+                  if (player.id === room.bombHolderId && data.answerIndex === q.correctIndex) {
+                    passBombToNext(room, player, 'correct_answer');
+                  }
+                }
               }
             } else if (data.answerIndex === null && player.currentAnswer !== null) {
               // Stepped back to center pad
@@ -615,6 +730,62 @@ wss.on('connection', (ws) => {
                 answeredCount,
                 totalPlayers: room.players.size
               });
+            }
+          }
+
+          // Bomb tag physical collision check
+          if (room.gameMode === 'bomb_tag' && room.phase === 'QUESTION') {
+            const timeSinceLastPass = now - (room.lastBombPassTime || 0);
+            const qTime = (now - room.questionStartTime) / 1000;
+            const botX = Math.sin(qTime * 1.5) * 3.5;
+            const botZ = Math.cos(qTime * 1.5) * 3.5;
+
+            if (timeSinceLastPass > 1800) {
+              if (room.bombHolderId === player.id) {
+                // Current player holds the bomb - check if touching another player or bot
+                let passed = false;
+                for (const other of room.players.values()) {
+                  if (other.id !== player.id) {
+                    const dist = Math.hypot(player.x - other.x, player.z - other.z);
+                    if (dist < 1.8) {
+                      passBombToNext(room, player, 'physical_tag');
+                      passed = true;
+                      break;
+                    }
+                  }
+                }
+                if (!passed) {
+                  // Check distance to bot
+                  const distToBot = Math.hypot(player.x - botX, player.z - botZ);
+                  if (distToBot < 2.0) {
+                    room.bombHolderId = 'bot_target';
+                    room.lastBombPassTime = now;
+                    broadcastToRoom(room, {
+                      type: 'BOMB_PASSED',
+                      bombHolderId: 'bot_target',
+                      fromName: player.name,
+                      toName: '🤖 RoboTarget',
+                      reason: 'physical_tag'
+                    });
+                    console.log(`[WS] Bomb tagged to RoboTarget in room ${room.code} by ${player.name}`);
+                  }
+                }
+              } else if (room.bombHolderId === 'bot_target') {
+                // Bot holds bomb - if player gets close to bot, bot tags player!
+                const distToBot = Math.hypot(player.x - botX, player.z - botZ);
+                if (distToBot < 2.0) {
+                  room.bombHolderId = player.id;
+                  room.lastBombPassTime = now;
+                  broadcastToRoom(room, {
+                    type: 'BOMB_PASSED',
+                    bombHolderId: player.id,
+                    fromName: '🤖 RoboTarget',
+                    toName: player.name,
+                    reason: 'bot_tag'
+                  });
+                  console.log(`[WS] RoboTarget tagged bomb to ${player.name} in room ${room.code}`);
+                }
+              }
             }
           }
 
@@ -653,8 +824,16 @@ wss.on('connection', (ws) => {
             p.streak = 0;
             p.currentAnswer = null;
             p.answerTimeMs = null;
-            p.x = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
-            p.z = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+            if (room.gameMode === 'glass_bridge') {
+              p.x = (Math.random() - 0.5) * 4;
+              p.z = 7.2;
+            } else if (room.gameMode === 'bomb_tag') {
+              p.x = (Math.random() - 0.5) * 6;
+              p.z = (Math.random() - 0.5) * 6;
+            } else {
+              p.x = (Math.random() - 0.5) * 2;
+              p.z = (Math.random() - 0.5) * 2;
+            }
             p.jumping = false;
             p.powerups = { fiftyFifty: true, doublePoints: true };
             p.activeDoublePoints = false;

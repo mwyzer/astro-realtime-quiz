@@ -18,7 +18,7 @@ export interface QuizData {
 
 export type RoomPhase = 'LOBBY' | 'COUNTDOWN' | 'QUESTION' | 'REVIEW' | 'LEADERBOARD' | 'FINISHED';
 
-export type GameMode = 'glass_bridge' | 'lava_tiles' | 'classic';
+export type GameMode = 'bomb_tag' | 'glass_bridge' | 'lava_tiles' | 'classic';
 
 export interface PlayerSummary {
   id: string;
@@ -32,6 +32,7 @@ export interface PlayerSummary {
   z?: number;
   jumping?: boolean;
   currentAnswer?: number | null;
+  exploded?: boolean;
 }
 
 export interface AnswerStats {
