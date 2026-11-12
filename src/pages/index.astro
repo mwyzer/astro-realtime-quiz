@@ -6,17 +6,10 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
 <Layout title="Beranda | Platform Kuis Realtime Isometric Neo-Brutalist Arcade">
   <!-- Hero Section dengan Pratinjau Papan Diorama Isometrik 3D -->
   <section class="py-12 sm:py-16 border-b-2 border-black bg-[#0b0f19] relative overflow-hidden">
-    <!-- Isometric Grid Floor Ambient Texture -->
-    <div class="absolute inset-0 iso-grid-floor opacity-35 pointer-events-none"></div>
-
     <div class="max-w-6xl mx-auto px-4 relative z-10">
       <div class="grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
         <!-- Kolom Kiri: Copywriting & Diorama Isometrik 3D -->
         <div class="lg:col-span-7 text-left">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-4 uppercase">
-            <span>📐 ISOMETRIC NEO-BRUTALIST TOYBOX</span>
-          </div>
-
           <h1 class="font-['Space_Grotesk',sans-serif] text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08] mb-5">
             Kuis Realtime Taktil dengan <span class="text-amber-400 underline decoration-black decoration-4">Diorama Isometrik 3D</span>
           </h1>
@@ -44,49 +37,41 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
           <!-- Pratinjau Papan Diorama Isometrik 3D Interaktif -->
           <div class="iso-card p-5 bg-[#151c2c] max-w-xl">
             <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-black">
-              <div class="flex items-center gap-2">
-                <span class="w-3 h-3 rounded-full bg-red-500 border border-black"></span>
-                <span class="w-3 h-3 rounded-full bg-amber-400 border border-black"></span>
-                <span class="w-3 h-3 rounded-full bg-emerald-500 border border-black"></span>
-                <span class="font-mono text-xs font-black text-white ml-1">PRATINJAU ARENA ISOMETRIK 3D</span>
-              </div>
-              <span class="text-[11px] font-mono text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black font-bold">
-                Kamera 45° Aktif
-              </span>
+              <span class="font-mono text-xs font-black text-white">PRATINJAU ARENA ISOMETRIK 3D</span>
+              <a href="/host" class="text-[11px] font-mono text-amber-400 bg-[#0b0f19] hover:bg-slate-800 px-2.5 py-0.5 rounded border border-black font-bold transition-colors">
+                Coba Kamera 45°
+              </a>
             </div>
 
             <!-- 3D Isometric Diorama Stage Container -->
             <div class="h-44 sm:h-52 bg-[#090d16] border-2 border-black rounded-xl relative overflow-hidden flex items-center justify-center select-none">
-              <!-- Grid background -->
-              <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
-
               <!-- Perspective Wrapper -->
               <div class="relative" style="perspective: 800px;">
                 <!-- Rotated Isometric Floor Plane -->
                 <div class="w-48 h-48 sm:w-56 sm:h-56 iso-stage grid grid-cols-2 gap-2 p-2 bg-[#111827] border-2 border-black shadow-[10px_10px_0px_rgba(0,0,0,0.8)] rounded-lg">
                   <!-- Tile 0: Merah ▲ -->
-                  <div class="iso-tile bg-red-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                  <a href="/host" class="iso-tile bg-red-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform" aria-label="Ubin Isometrik Opsi A">
                     <span>▲</span>
                     <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI A</span>
-                  </div>
+                  </a>
 
                   <!-- Tile 1: Biru ◆ -->
-                  <div class="iso-tile bg-blue-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                  <a href="/host" class="iso-tile bg-blue-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform" aria-label="Ubin Isometrik Opsi B">
                     <span>◆</span>
                     <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI B</span>
-                  </div>
+                  </a>
 
                   <!-- Tile 2: Kuning ● -->
-                  <div class="iso-tile bg-amber-400 border-2 border-black flex flex-col items-center justify-center text-slate-950 font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                  <a href="/host" class="iso-tile bg-amber-400 border-2 border-black flex flex-col items-center justify-center text-slate-950 font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform" aria-label="Ubin Isometrik Opsi C">
                     <span>●</span>
                     <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI C</span>
-                  </div>
+                  </a>
 
                   <!-- Tile 3: Hijau ■ -->
-                  <div class="iso-tile bg-emerald-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                  <a href="/host" class="iso-tile bg-emerald-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform" aria-label="Ubin Isometrik Opsi D">
                     <span>■</span>
                     <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI D</span>
-                  </div>
+                  </a>
                 </div>
 
                 <!-- Floating Isometric Characters & Bomb -->
@@ -106,8 +91,8 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
 
               <!-- Overlay Hint -->
               <div class="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[11px] font-mono text-slate-400 pointer-events-none">
-                <span>📍 4 Kuadran Isometrik</span>
-                <span class="text-amber-400">Orthographic Projection</span>
+                <span>4 Kuadran Isometrik</span>
+                <span class="text-amber-400">Orthographic 45°</span>
               </div>
             </div>
           </div>
@@ -179,9 +164,6 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
   <section id="mode-arena" class="py-14 sm:py-20 border-b-2 border-black bg-[#0d121f]">
     <div class="max-w-6xl mx-auto px-4">
       <div class="mb-10 text-left">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-2 uppercase">
-          MODE ARENA 3D
-        </div>
         <h2 class="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
           3 Pilihan Arena Diorama Isometrik
         </h2>
@@ -270,9 +252,6 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
     <div class="max-w-6xl mx-auto px-4">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
-          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-2 uppercase">
-            BANK SOAL
-          </div>
           <h2 class="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-white tracking-tight">
             Paket Soal Siap Main
           </h2>
