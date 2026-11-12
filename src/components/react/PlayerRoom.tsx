@@ -186,7 +186,7 @@ export default function PlayerRoom() {
       }
 
       case 'PLAYERS_POSITIONS': {
-        const posMap = new Map((msg.positions || []).map((p: any) => [p.id, p]));
+        const posMap = new Map<string, any>((msg.positions || []).map((p: any) => [p.id, p]));
         setArenaPlayers(prev => {
           if (prev.length === 0 && msg.positions) {
             return msg.positions.map((p: any) => ({
@@ -675,7 +675,7 @@ export default function PlayerRoom() {
                 <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
                   <RobloxArena3D
                     phase="LOBBY"
-                    arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                    arenaMode={gameMode}
                     bombHolderId={bombHolderId}
                     explodedPlayerId={explodedPlayerId}
                     localPlayerId={playerId}
@@ -795,7 +795,7 @@ export default function PlayerRoom() {
             <div className="mb-3 border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
               <RobloxArena3D
                 phase="QUESTION"
-                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                arenaMode={gameMode}
                 bombHolderId={bombHolderId}
                 explodedPlayerId={explodedPlayerId}
                 localPlayerId={playerId}
@@ -1015,7 +1015,7 @@ export default function PlayerRoom() {
               <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
                 <RobloxArena3D
                   phase="REVIEW"
-                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  arenaMode={gameMode}
                   bombHolderId={bombHolderId}
                   explodedPlayerId={explodedPlayerId}
                   localPlayerId={playerId}

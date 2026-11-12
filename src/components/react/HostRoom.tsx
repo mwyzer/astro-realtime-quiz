@@ -190,7 +190,7 @@ export default function HostRoom() {
         break;
 
       case 'PLAYERS_POSITIONS': {
-        const posMap = new Map((msg.positions || []).map((p: any) => [p.id, p]));
+        const posMap = new Map<string, any>((msg.positions || []).map((p: any) => [p.id, p]));
         setPlayers(prev => prev.map(pl => {
           const pos = posMap.get(pl.id);
           if (pos) {
@@ -664,7 +664,7 @@ export default function HostRoom() {
             </div>
             <RobloxArena3D
               phase="LOBBY"
-              arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+              arenaMode={gameMode}
               worldTheme={worldTheme}
               onChangeTheme={changeWorldTheme}
               isHost={true}
@@ -815,7 +815,7 @@ export default function HostRoom() {
               <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
                 <RobloxArena3D
                   phase="LOBBY"
-                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  arenaMode={gameMode}
                   bombHolderId={bombHolderId}
                   explodedPlayerId={explodedPlayerId}
                   isHost={true}
@@ -963,7 +963,7 @@ export default function HostRoom() {
               <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
                 <RobloxArena3D
                   phase={phase}
-                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  arenaMode={gameMode}
                   bombHolderId={bombHolderId}
                   explodedPlayerId={explodedPlayerId}
                   isHost={true}

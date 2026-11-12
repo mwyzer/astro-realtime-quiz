@@ -87,9 +87,13 @@ export default function RobloxArena3D({
   });
 
   const [currentStandingZone, setCurrentStandingZone] = useState<number | null>(selectedZone);
-  const [isIsometric, setIsIsometric] = useState(true);
-  const isIsometricRef = useRef(true);
+  const [isIsometric, setIsIsometric] = useState(!!isHost);
+  const isIsometricRef = useRef(!!isHost);
   isIsometricRef.current = isIsometric;
+
+  // Third-person follow camera & player facing yaw refs
+  const camYawRef = useRef(0);
+  const playerFacingYawRef = useRef(Math.PI);
 
   // Latest props stored in refs for the 60fps render loop
   const phaseRef = useRef(phase);
@@ -873,7 +877,7 @@ export default function RobloxArena3D({
       const centerTopMat = new THREE.MeshBasicMaterial({ map: centerTex });
       centerPad.material = [
         centerPadMat, centerPadMat, centerTopMat, centerPadMat, centerPadMat, centerPadMat
-      ];
+      ] as any;
 
       // 4 Color Quadrants
       QUADRANT_CONFIGS.forEach((q, idx) => {
@@ -1280,6 +1284,40 @@ export default function RobloxArena3D({
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
+    // Pointer drag for Third-Person Camera Orbit
+    let isDragging = false;
+    let prevPointerX = 0;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.button === 0 || e.pointerType === 'touch') {
+        isDragging = true;
+        prevPointerX = e.clientX;
+        try {
+          container.setPointerCapture(e.pointerId);
+        } catch (_) {}
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (isDragging && !isIsometricRef.current) {
+        const deltaX = e.clientX - prevPointerX;
+        camYawRef.current -= deltaX * 0.007;
+        prevPointerX = e.clientX;
+      }
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      isDragging = false;
+      try {
+        container.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+    };
+
+    container.addEventListener('pointerdown', handlePointerDown);
+    container.addEventListener('pointermove', handlePointerMove);
+    container.addEventListener('pointerup', handlePointerUp);
+    container.addEventListener('pointercancel', handlePointerUp);
+
     // 8. 60 FPS Animation Render Loop
     let animationFrameId: number;
     let lastTime = performance.now();
@@ -1309,10 +1347,41 @@ export default function RobloxArena3D({
       let dx = 0;
       let dz = 0;
 
-      if (keysRef.current.w) { dz -= speed; moved = true; }
-      if (keysRef.current.s) { dz += speed; moved = true; }
-      if (keysRef.current.a) { dx -= speed; moved = true; }
-      if (keysRef.current.d) { dx += speed; moved = true; }
+      if (!isIsometricRef.current) {
+        // Third-person camera-relative movement
+        const camYaw = camYawRef.current;
+        const fwdX = -Math.sin(camYaw);
+        const fwdZ = -Math.cos(camYaw);
+        const rgtX = Math.cos(camYaw);
+        const rgtZ = -Math.sin(camYaw);
+
+        let moveFwd = 0;
+        let moveRgt = 0;
+        if (keysRef.current.w) { moveFwd += 1; moved = true; }
+        if (keysRef.current.s) { moveFwd -= 1; moved = true; }
+        if (keysRef.current.a) { moveRgt -= 1; moved = true; }
+        if (keysRef.current.d) { moveRgt += 1; moved = true; }
+
+        if (moved) {
+          const len = Math.hypot(moveFwd, moveRgt);
+          if (len > 0) {
+            moveFwd /= len;
+            moveRgt /= len;
+          }
+          dx = (fwdX * moveFwd + rgtX * moveRgt) * speed;
+          dz = (fwdZ * moveFwd + rgtZ * moveRgt) * speed;
+          playerFacingYawRef.current = Math.atan2(dx, dz);
+        }
+      } else {
+        // Isometric world-axis movement
+        if (keysRef.current.w) { dz -= speed; moved = true; }
+        if (keysRef.current.s) { dz += speed; moved = true; }
+        if (keysRef.current.a) { dx -= speed; moved = true; }
+        if (keysRef.current.d) { dx += speed; moved = true; }
+        if (moved) {
+          playerFacingYawRef.current = Math.atan2(dx, dz);
+        }
+      }
 
       // Boundaries depending on mode
       if (isBridge) {
@@ -1404,17 +1473,19 @@ export default function RobloxArena3D({
       const activeIds = new Set<string>();
 
       // Ensure local preview character exists if host or no players
-      const isSoloPreview = isHost || currentPlayers.length === 0;
+      const hasLocalInPlayers = localPlayerId ? currentPlayers.some(p => p.id === localPlayerId) : false;
+      const isSoloPreview = isHost || !hasLocalInPlayers;
       if (isSoloPreview) {
-        const previewId = 'preview_host';
+        const previewId = isHost ? 'preview_host' : 'preview_local_player';
         activeIds.add(previewId);
         if (!characterGroups.has(previewId)) {
-          const char = createRobloxCharacter(isHost ? 'Host 👑' : 'Pemain 🎮', '🦊', 0x9333ea);
+          const char = createRobloxCharacter(isHost ? 'Host 👑' : 'Pemain 🎮', isHost ? '👑' : '🦊', 0x9333ea);
           characterGroups.set(previewId, char);
           scene.add(char);
         }
         const hostChar = characterGroups.get(previewId)!;
         hostChar.position.set(localPosRef.current.x, localPosRef.current.y, localPosRef.current.z);
+        hostChar.rotation.y = playerFacingYawRef.current;
 
         const { leftArm, rightArm, leftLeg, rightLeg } = hostChar.userData;
         if (moved) {
@@ -1481,6 +1552,9 @@ export default function RobloxArena3D({
         } else {
           char.rotation.x = 0;
           char.rotation.z = 0;
+          if (isLocal) {
+            char.rotation.y = playerFacingYawRef.current;
+          }
         }
 
         // Smooth position lerp
@@ -1646,6 +1720,41 @@ export default function RobloxArena3D({
           orthoCamera.position.set(20 + offsetX, 20, 20 + offsetZ);
           orthoCamera.lookAt(offsetX, 0, offsetZ);
         }
+      } else {
+        // Third-Person Follow Camera ala Roblox
+        if (!isHost) {
+          const px = localPosRef.current.x;
+          const py = localPosRef.current.y;
+          const pz = localPosRef.current.z;
+
+          const camDist = isBridge ? 6.2 : 7.2;
+          const camHeight = isBridge ? 3.6 : 4.2;
+
+          const idealCamX = px + Math.sin(camYawRef.current) * camDist;
+          const idealCamY = py + camHeight;
+          const idealCamZ = pz + Math.cos(camYawRef.current) * camDist;
+
+          perspCamera.position.x += (idealCamX - perspCamera.position.x) * 0.18;
+          perspCamera.position.y += (idealCamY - perspCamera.position.y) * 0.18;
+          perspCamera.position.z += (idealCamZ - perspCamera.position.z) * 0.18;
+
+          const lookX = px - Math.sin(camYawRef.current) * 3.5;
+          const lookY = py + 1.4;
+          const lookZ = pz - Math.cos(camYawRef.current) * 3.5;
+          perspCamera.lookAt(lookX, lookY, lookZ);
+        } else {
+          // Host perspective overview
+          if (isBridge) {
+            perspCamera.position.set(0, 15.5, 17.5);
+            perspCamera.lookAt(0, -0.6, -0.5);
+          } else if (isBomb) {
+            perspCamera.position.set(0, 20.5, 22.5);
+            perspCamera.lookAt(0, -0.5, 0);
+          } else {
+            perspCamera.position.set(0, 20, 23);
+            perspCamera.lookAt(0, -0.5, 0);
+          }
+        }
       }
 
       const activeCamera = isIsometricRef.current ? orthoCamera : perspCamera;
@@ -1680,6 +1789,10 @@ export default function RobloxArena3D({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
+      container.removeEventListener('pointerdown', handlePointerDown);
+      container.removeEventListener('pointermove', handlePointerMove);
+      container.removeEventListener('pointerup', handlePointerUp);
+      container.removeEventListener('pointercancel', handlePointerUp);
       renderer.dispose();
       canvasTextures.forEach(t => t.dispose());
       if (container.contains(renderer.domElement)) {
@@ -1737,9 +1850,9 @@ export default function RobloxArena3D({
           type="button"
           onClick={() => setIsIsometric(prev => !prev)}
           className="bg-[#0b0f19] hover:bg-slate-800 text-amber-400 border-2 border-black px-2.5 sm:px-3 py-1 rounded-xl text-xs font-mono font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer iso-btn active:translate-x-[1px] active:translate-y-[1px]"
-          title="Ganti Sudut Pandang Kamera (Isometrik / Perspektif)"
+          title="Ganti Sudut Pandang Kamera (Isometrik / 3rd-Person Follow)"
         >
-          <span>{isIsometric ? '📐 Isometrik' : '🎥 Perspektif'}</span>
+          <span>{isIsometric ? '📐 PoV: Isometrik' : '🎥 PoV: 3rd-Person Roblox'}</span>
         </button>
       </div>
 
@@ -1800,20 +1913,21 @@ export default function RobloxArena3D({
         )}
       </div>
 
-      {/* Keyboard movement hint */}
+      {/* Keyboard movement & Drag Orbit hint */}
       <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-[#0b0f19] px-2.5 py-1 rounded-xl text-[11px] text-slate-300 border-2 border-black shadow-[2px_2px_0px_#000] pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24' : 'top-14'}`}>
         <span>Gunakan</span>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">W</kbd>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">A</kbd>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">S</kbd>
         <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">D</kbd>
-        <span>/ Panah & Spasi</span>
+        <span>/ Panah</span>
+        {!isIsometric && <span className="text-amber-400 font-bold ml-1">• Geser Mouse/Layar untuk Putar Kamera</span>}
       </div>
 
       {/* Bottom Interactive Quick-Move Dock */}
       <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 z-10">
         {/* 4 Quadrant / Glass Lanes Quick-Run Buttons */}
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 flex-1 max-w-lg">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 flex-1 max-w-xs sm:max-w-md">
           {QUADRANT_CONFIGS.map((q, idx) => {
             const isSelected = currentStandingZone === idx;
             return (
@@ -1836,15 +1950,65 @@ export default function RobloxArena3D({
           })}
         </div>
 
-        {/* Jump Button */}
-        <button
-          type="button"
-          onClick={triggerJump}
-          className="iso-btn bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
-        >
-          <span>🦘</span>
-          <span>Lompat</span>
-        </button>
+        {/* Player D-Pad & Jump Controls (terutama untuk sentuh/HP di layar Player) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {!isHost && (
+            <div className="flex items-center gap-1 bg-[#0b0f19]/90 border-2 border-black p-1 rounded-xl shadow-[3px_3px_0px_#000]">
+              <button
+                type="button"
+                onPointerDown={() => { keysRef.current.a = true; }}
+                onPointerUp={() => { keysRef.current.a = false; }}
+                onPointerLeave={() => { keysRef.current.a = false; }}
+                className="w-8 h-8 sm:w-9 sm:h-9 bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border border-black rounded-lg font-black text-xs flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                title="Kiri (A)"
+              >
+                ⬅️
+              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onPointerDown={() => { keysRef.current.w = true; }}
+                  onPointerUp={() => { keysRef.current.w = false; }}
+                  onPointerLeave={() => { keysRef.current.w = false; }}
+                  className="w-8 h-8 sm:w-9 sm:h-9 bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border border-black rounded-lg font-black text-xs flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                  title="Maju (W)"
+                >
+                  ⬆️
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={() => { keysRef.current.s = true; }}
+                  onPointerUp={() => { keysRef.current.s = false; }}
+                  onPointerLeave={() => { keysRef.current.s = false; }}
+                  className="w-8 h-8 sm:w-9 sm:h-9 bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border border-black rounded-lg font-black text-xs flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                  title="Mundur (S)"
+                >
+                  ⬇️
+                </button>
+              </div>
+              <button
+                type="button"
+                onPointerDown={() => { keysRef.current.d = true; }}
+                onPointerUp={() => { keysRef.current.d = false; }}
+                onPointerLeave={() => { keysRef.current.d = false; }}
+                className="w-8 h-8 sm:w-9 sm:h-9 bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border border-black rounded-lg font-black text-xs flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                title="Kanan (D)"
+              >
+                ➡️
+              </button>
+            </div>
+          )}
+
+          {/* Jump Button */}
+          <button
+            type="button"
+            onClick={triggerJump}
+            className="iso-btn bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-3.5 sm:px-4 py-2.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center gap-1.5 cursor-pointer transition-all"
+          >
+            <span>🦘</span>
+            <span className="hidden sm:inline">Lompat</span>
+          </button>
+        </div>
       </div>
     </div>
   );
