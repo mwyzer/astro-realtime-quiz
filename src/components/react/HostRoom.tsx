@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { PlayerSummary, QuizQuestion, AnswerStats } from '../../types/quiz';
+import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode } from '../../types/quiz';
 import { DEFAULT_QUIZZES } from '../../data/default-quizzes';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
@@ -56,7 +56,7 @@ export default function HostRoom() {
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [robloxMode, setRobloxMode] = useState(true);
+  const [gameMode, setGameMode] = useState<GameMode>('glass_bridge');
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [powerupToast, setPowerupToast] = useState<{ text: string; id: number } | null>(null);
 
@@ -131,7 +131,13 @@ export default function HostRoom() {
       case 'ROOM_CREATED':
         setRoomCode(msg.code);
         setQuizMeta({ title: msg.quiz.title, count: msg.quiz.questionCount });
+        if (msg.gameMode) setGameMode(msg.gameMode);
         setPhase('LOBBY');
+        break;
+
+      case 'GAME_MODE_UPDATED':
+        if (msg.gameMode) setGameMode(msg.gameMode);
+        sound.playPop();
         break;
 
       case 'PLAYER_LIST_UPDATE':
@@ -249,8 +255,84 @@ export default function HostRoom() {
 
   const createRoom = (quizId: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId }));
+      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode }));
     }
+  };
+
+  const changeGameMode = (newMode: GameMode) => {
+    setGameMode(newMode);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(JSON.stringify({ type: 'SET_GAME_MODE', gameMode: newMode }));
+    }
+  };
+
+  const renderModeSelector = (compact = false) => {
+    const modes: { id: GameMode; label: string; icon: string; desc: string }[] = [
+      { id: 'glass_bridge', label: 'Jembatan Kaca 3D', icon: '🌉', desc: 'Jalur kaca transparan ke tebing piala finish' },
+      { id: 'lava_tiles', label: 'Lantai Lava 3D', icon: '🌋', desc: '4 Kuadran lantai runtuh ke lautan lava' },
+      { id: 'classic', label: 'Mode Klasik', icon: '📋', desc: 'Tampilan tombol kuis 2D minimalis' },
+    ];
+
+    if (compact) {
+      return (
+        <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 rounded-2xl shadow-lg backdrop-blur">
+          {modes.map(m => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => changeGameMode(m.id)}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                gameMode === m.id
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'text-gray-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title={m.desc}
+            >
+              <span>{m.icon}</span>
+              <span className="hidden sm:inline">{m.label}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-8">
+        <h3 className="text-sm font-extrabold text-purple-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>🎮 Pilih Mode Permainan Live:</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {modes.map(m => {
+            const isSelected = gameMode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setGameMode(m.id)}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 ${
+                  isSelected
+                    ? 'bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border-purple-400 shadow-xl shadow-purple-600/25 ring-2 ring-purple-400/60'
+                    : 'bg-slate-800/60 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
+                }`}
+              >
+                <span className="text-3xl shrink-0 p-2 rounded-2xl bg-black/40 border border-white/10">{m.icon}</span>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-extrabold text-white text-sm sm:text-base">{m.label}</h4>
+                    {isSelected && (
+                      <span className="text-[10px] bg-purple-500 text-white font-black px-2 py-0.5 rounded-full shadow-sm">
+                        AKTIF
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-300 leading-snug">{m.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const startGame = () => {
@@ -435,6 +517,9 @@ export default function HostRoom() {
           </div>
         </div>
 
+        {/* 3-Way Game Mode Selector */}
+        {renderModeSelector(false)}
+
         <div className="grid md:grid-cols-2 gap-6">
           {availableQuizzes.map((quiz) => (
             <div 
@@ -479,20 +564,10 @@ export default function HostRoom() {
           {/* Top Header Card with PIN & QR Code */}
           <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl mb-8 relative overflow-hidden">
             <div className="absolute top-4 right-4 flex items-center gap-2">
-              <button 
-                onClick={() => setRobloxMode(!robloxMode)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  robloxMode 
-                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md shadow-purple-600/30' 
-                    : 'bg-slate-800/80 text-gray-400 border-slate-700 hover:text-white'
-                }`}
-                title="Ganti Mode Tampilan Kuis"
-              >
-                <span>{robloxMode ? '🎮 Mode 3D Arena' : '📋 Mode Klasik'}</span>
-              </button>
+              {renderModeSelector(true)}
               <button 
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-lg border border-slate-600 text-xs"
+                className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-xl border border-slate-600 text-xs shadow-md"
                 title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
               >
                 {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -555,12 +630,12 @@ export default function HostRoom() {
           </div>
 
           {/* Roblox 3D Arena Preview in Lobby */}
-          {robloxMode && (
+          {gameMode !== 'classic' && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
-                    🎮 3D Color Survival Arena (Lobby Preview)
+                    {gameMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D (Lobby Preview)' : '🌋 Lantai Lava 3D (Lobby Preview)'}
                   </span>
                   <span className="text-xs text-purple-300 bg-purple-500/20 px-2.5 py-0.5 rounded-full border border-purple-500/30 hidden sm:inline">
                     Host & Pemain dapat bergerak dengan WASD / Tombol Arah
@@ -569,6 +644,7 @@ export default function HostRoom() {
               </div>
               <RobloxArena3D
                 phase="LOBBY"
+                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
                 isHost={true}
                 players={players}
               />
@@ -662,29 +738,19 @@ export default function HostRoom() {
               <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-xs sm:text-sm border border-purple-500/30">
                 Soal {currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
               </span>
-              <button 
-                onClick={() => setRobloxMode(!robloxMode)}
-                className={`px-3 py-1 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  robloxMode 
-                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md' 
-                    : 'bg-slate-800 text-gray-400 border-slate-700 hover:text-white'
-                }`}
-                title="Ganti Mode Tampilan Soal"
-              >
-                <span>{robloxMode ? '🎮 3D Arena' : '📋 Klasik'}</span>
-              </button>
+              {renderModeSelector(true)}
             </div>
 
             <div className="flex items-center gap-3 sm:gap-6">
-              {!isReview && (
+              {!isReview && gameMode !== 'classic' && (
                 <button
                   type="button"
                   onClick={skipTimer}
                   className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-extrabold text-xs rounded-xl shadow-lg border border-red-400/40 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                  title="Langsung akhiri waktu dan runtuhkan lantai yang salah"
+                  title="Langsung akhiri waktu dan runtuhkan lantai/kaca yang salah"
                 >
                   <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>Runtuhkan Lantai</span>
+                  <span>{gameMode === 'glass_bridge' ? 'Pecahkan Kaca' : 'Runtuhkan Lantai'}</span>
                 </button>
               )}
 
@@ -715,10 +781,11 @@ export default function HostRoom() {
           </div>
 
           {/* 3D Roblox Arena or Classic View */}
-          {robloxMode ? (
+          {gameMode !== 'classic' ? (
             <div className="mb-6 space-y-4">
               <RobloxArena3D
                 phase={phase}
+                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
                 isHost={true}
                 players={players}
                 correctIndex={isReview ? currentQuestion.correctIndex : null}

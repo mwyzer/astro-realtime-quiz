@@ -18,6 +18,8 @@ export interface QuizData {
 
 export type RoomPhase = 'LOBBY' | 'COUNTDOWN' | 'QUESTION' | 'REVIEW' | 'LEADERBOARD' | 'FINISHED';
 
+export type GameMode = 'glass_bridge' | 'lava_tiles' | 'classic';
+
 export interface PlayerSummary {
   id: string;
   name: string;

@@ -305,8 +305,8 @@ function startQuestion(room, index) {
     p.currentAnswer = null;
     p.answerTimeMs = null;
     p.activeDoublePoints = false;
-    p.x = (Math.random() - 0.5) * 2;
-    p.z = (Math.random() - 0.5) * 2;
+    p.x = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
+    p.z = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
     p.jumping = false;
   }
 
@@ -380,11 +380,13 @@ wss.on('connection', (ws) => {
           // Find quiz in disk/memory quizzes
           const selectedQuiz = quizzes.find(q => q.id === data.quizId) || quizzes[0];
           const code = generateRoomCode();
+          const gameMode = ['glass_bridge', 'lava_tiles', 'classic'].includes(data.gameMode) ? data.gameMode : 'glass_bridge';
           
           const room = {
             code,
             hostWs: ws,
             quiz: selectedQuiz,
+            gameMode,
             phase: 'LOBBY',
             currentQuestionIndex: 0,
             timer: null,
@@ -400,6 +402,7 @@ wss.on('connection', (ws) => {
           safeSend(ws, {
             type: 'ROOM_CREATED',
             code,
+            gameMode: room.gameMode,
             quiz: {
               id: selectedQuiz.id,
               title: selectedQuiz.title,
@@ -407,7 +410,7 @@ wss.on('connection', (ws) => {
               questionCount: selectedQuiz.questions.length
             }
           });
-          console.log(`[WS] Room created: ${code} with quiz "${selectedQuiz.title}"`);
+          console.log(`[WS] Room created: ${code} (Mode: ${room.gameMode}) with quiz "${selectedQuiz.title}"`);
           break;
         }
 
@@ -428,6 +431,9 @@ wss.on('connection', (ws) => {
           }
 
           const playerId = 'p_' + Math.random().toString(36).substring(2, 9);
+          const spawnX = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
+          const spawnZ = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+
           const newPlayer = {
             id: playerId,
             name,
@@ -438,8 +444,8 @@ wss.on('connection', (ws) => {
             currentAnswer: null,
             answerTimeMs: null,
             lastReactionTime: 0,
-            x: (Math.random() - 0.5) * 2,
-            z: (Math.random() - 0.5) * 2,
+            x: spawnX,
+            z: spawnZ,
             jumping: false,
             powerups: { fiftyFifty: true, doublePoints: true },
             activeDoublePoints: false
@@ -454,6 +460,7 @@ wss.on('connection', (ws) => {
             playerId,
             code,
             name,
+            gameMode: room.gameMode,
             quizTitle: room.quiz.title,
             questionCount: room.quiz.questions.length
           });
@@ -464,7 +471,27 @@ wss.on('connection', (ws) => {
             players
           });
 
-          console.log(`[WS] Player ${name} joined room ${code}`);
+          console.log(`[WS] Player ${name} joined room ${code} (Mode: ${room.gameMode})`);
+          break;
+        }
+
+        case 'SET_GAME_MODE': {
+          if (!isHost || !boundRoom) return;
+          const mode = data.gameMode;
+          if (['glass_bridge', 'lava_tiles', 'classic'].includes(mode)) {
+            boundRoom.gameMode = mode;
+            // Reposition players in lobby if changing to glass bridge or lava
+            for (const p of boundRoom.players.values()) {
+              p.x = mode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
+              p.z = mode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
+            }
+            broadcastToRoom(boundRoom, {
+              type: 'GAME_MODE_UPDATED',
+              gameMode: boundRoom.gameMode
+            });
+            broadcastPlayersPositions(boundRoom);
+            console.log(`[WS] Room ${boundRoom.code} gameMode changed to ${mode}`);
+          }
           break;
         }
 
@@ -509,16 +536,25 @@ wss.on('connection', (ws) => {
           player.currentAnswer = answerIndex;
           player.answerTimeMs = Date.now() - room.questionStartTime;
 
-          // Map answer index to Roblox 3D color quadrant coords
-          const quadrantCenters = [
-            { x: -6, z: -6 }, // 0: ▲ Merah
-            { x: 6, z: -6 },  // 1: ◆ Biru
-            { x: -6, z: 6 },  // 2: ● Kuning
-            { x: 6, z: 6 }    // 3: ■ Hijau
-          ];
-          if (quadrantCenters[answerIndex]) {
-            player.x = quadrantCenters[answerIndex].x + (Math.random() - 0.5) * 3;
-            player.z = quadrantCenters[answerIndex].z + (Math.random() - 0.5) * 3;
+          if (room.gameMode === 'glass_bridge') {
+            // Map answer index to 4 glass bridge lanes at z = 0
+            const glassLanes = [-7.2, -2.4, 2.4, 7.2];
+            if (glassLanes[answerIndex] !== undefined) {
+              player.x = glassLanes[answerIndex] + (Math.random() - 0.5) * 0.8;
+              player.z = 0 + (Math.random() - 0.5) * 0.8;
+            }
+          } else {
+            // Map answer index to Roblox 3D color quadrant coords (lava tiles)
+            const quadrantCenters = [
+              { x: -6, z: -6 }, // 0: ▲ Merah
+              { x: 6, z: -6 },  // 1: ◆ Biru
+              { x: -6, z: 6 },  // 2: ● Kuning
+              { x: 6, z: 6 }    // 3: ■ Hijau
+            ];
+            if (quadrantCenters[answerIndex]) {
+              player.x = quadrantCenters[answerIndex].x + (Math.random() - 0.5) * 3;
+              player.z = quadrantCenters[answerIndex].z + (Math.random() - 0.5) * 3;
+            }
           }
 
           safeSend(ws, { type: 'ANSWER_ACK', answerIndex });
@@ -617,8 +653,8 @@ wss.on('connection', (ws) => {
             p.streak = 0;
             p.currentAnswer = null;
             p.answerTimeMs = null;
-            p.x = (Math.random() - 0.5) * 2;
-            p.z = (Math.random() - 0.5) * 2;
+            p.x = room.gameMode === 'glass_bridge' ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2;
+            p.z = room.gameMode === 'glass_bridge' ? 7.2 : (Math.random() - 0.5) * 2;
             p.jumping = false;
             p.powerups = { fiftyFifty: true, doublePoints: true };
             p.activeDoublePoints = false;

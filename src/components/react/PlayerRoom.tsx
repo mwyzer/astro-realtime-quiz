@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { GameMode } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
@@ -43,8 +44,8 @@ export default function PlayerRoom() {
   // Floating reactions
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
 
-  // Roblox 3D Mode & Players
-  const [robloxMode, setRobloxMode] = useState(true);
+  // Game Mode & 3D Arena Players
+  const [gameMode, setGameMode] = useState<GameMode>('glass_bridge');
   const [arenaPlayers, setArenaPlayers] = useState<Player3DData[]>([]);
 
   // Power-Up Lifelines
@@ -131,6 +132,7 @@ export default function PlayerRoom() {
       case 'ROOM_JOINED':
         setPlayerId(msg.playerId);
         setRoomCode(msg.code);
+        if (msg.gameMode) setGameMode(msg.gameMode);
         setPhase('LOBBY');
         setErrorMsg(null);
         setArenaPlayers([{
@@ -138,10 +140,15 @@ export default function PlayerRoom() {
           name: name.trim() || 'Pemain',
           avatar,
           x: 0,
-          z: 0,
+          z: msg.gameMode === 'glass_bridge' ? 7.2 : 0,
           jumping: false,
           currentAnswer: null
         }]);
+        sound.playPop();
+        break;
+
+      case 'GAME_MODE_UPDATED':
+        if (msg.gameMode) setGameMode(msg.gameMode);
         sound.playPop();
         break;
 
@@ -456,6 +463,34 @@ export default function PlayerRoom() {
     );
   };
 
+  const renderPlayerModeSwitcher = () => {
+    const modes: { id: GameMode; label: string; icon: string }[] = [
+      { id: 'glass_bridge', label: 'Jembatan Kaca', icon: '🌉' },
+      { id: 'lava_tiles', label: 'Lantai Lava', icon: '🌋' },
+      { id: 'classic', label: 'Klasik', icon: '📋' },
+    ];
+
+    return (
+      <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 rounded-xl shadow-lg backdrop-blur">
+        {modes.map(m => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setGameMode(m.id)}
+            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              gameMode === m.id
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-gray-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span>{m.icon}</span>
+            <span className="hidden sm:inline">{m.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   // 1. Join Room Phase
   if (phase === 'JOIN') {
     return (
@@ -570,28 +605,18 @@ export default function PlayerRoom() {
                 </div>
               </div>
 
-              <button 
-                type="button"
-                onClick={() => setRobloxMode(!robloxMode)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  robloxMode 
-                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md shadow-purple-600/20' 
-                    : 'bg-slate-800 text-gray-400 border-slate-700 hover:text-white'
-                }`}
-                title="Ganti Mode Tampilan"
-              >
-                <span>{robloxMode ? '🎮 Mode 3D Arena' : '📋 Mode Klasik'}</span>
-              </button>
+              {renderPlayerModeSwitcher()}
             </div>
 
             {/* 3D Roblox Interactive Arena in Lobby */}
-            {robloxMode && (
+            {gameMode !== 'classic' && (
               <div className="mb-6">
                 <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
-                  <span>🎮 Arena Latihan (Gunakan WASD / Tombol Bawah untuk Bergerak)</span>
+                  <span>{gameMode === 'glass_bridge' ? '🌉 Latihan Jembatan Kaca (Gunakan WASD / Tombol Bawah)' : '🌋 Latihan Lantai Lava (Gunakan WASD / Tombol Bawah)'}</span>
                 </div>
                 <RobloxArena3D
                   phase="LOBBY"
+                  arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
                   localPlayerId={playerId}
                   players={arenaPlayers}
                   onMove={handlePlayerMove}
@@ -629,31 +654,25 @@ export default function PlayerRoom() {
 
   // 4. Question & Submitted Phase
   if ((phase === 'QUESTION' || phase === 'SUBMITTED') && questionData) {
-    // If in Roblox 3D Mode, players stay in the arena during both QUESTION and SUBMITTED
-    if (robloxMode) {
+    // If in 3D Arena Mode (Glass Bridge or Lava Tiles), players stay in the arena during both QUESTION and SUBMITTED
+    if (gameMode !== 'classic') {
       return (
         <>
           {renderFloatingReactions()}
           <div className="max-w-3xl mx-auto py-3 px-3 sm:px-4 pb-24">
-            {/* Top Bar Info & Mode Toggle */}
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-300 bg-slate-900/80 p-3 rounded-2xl border border-slate-800 backdrop-blur">
+            {/* Top Bar Info & Mode Switcher */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-gray-300 bg-slate-900/80 p-3 rounded-2xl border border-slate-800 backdrop-blur">
               <div className="flex items-center gap-2">
                 <span className="font-bold bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
                   Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setRobloxMode(false)}
-                  className="px-2.5 py-1 rounded-xl bg-slate-800 text-gray-400 hover:text-white border border-slate-700 font-bold"
-                >
-                  📋 Mode Klasik
-                </button>
+                {renderPlayerModeSwitcher()}
               </div>
 
               <div className="flex items-center gap-3">
                 {selectedOption !== null && (
                   <span className="hidden sm:inline-block text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
-                    ✓ Jawaban Terpilih: {OPTION_THEMES[selectedOption].shape} {OPTION_THEMES[selectedOption].label}
+                    ✓ Terpilih: {OPTION_THEMES[selectedOption].shape} {OPTION_THEMES[selectedOption].label}
                   </span>
                 )}
                 <span className={`font-mono font-bold text-sm sm:text-base flex items-center gap-1 ${
@@ -713,6 +732,7 @@ export default function PlayerRoom() {
             <div className="mb-3">
               <RobloxArena3D
                 phase="QUESTION"
+                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
                 localPlayerId={playerId}
                 players={arenaPlayers}
                 options={questionData.options}
@@ -762,7 +782,7 @@ export default function PlayerRoom() {
             </div>
 
             <p className="text-center text-[11px] text-gray-400">
-              💡 Gerakkan karakter ke warna pilihan atau tekan tombol warna di atas. Kamu masih bisa berpindah sebelum waktu habis!
+              💡 Gerakkan karakter ke jalur/petak pilihan atau tekan tombol warna di atas. Kamu masih bisa berpindah sebelum waktu habis!
             </p>
           </div>
           {renderReactionDock()}
@@ -783,13 +803,7 @@ export default function PlayerRoom() {
                   <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
                     Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setRobloxMode(true)}
-                    className="px-2.5 py-1 rounded-xl bg-purple-600/30 text-purple-200 border border-purple-500/40 font-bold"
-                  >
-                    🎮 3D Arena
-                  </button>
+                  {renderPlayerModeSwitcher()}
                 </div>
                 <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
                   timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
@@ -903,20 +917,14 @@ export default function PlayerRoom() {
               <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
 
               {chosenTheme && (
-                <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg`}>
+                <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg mb-6`}>
                   <span>{chosenTheme.shape}</span>
                   <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
                 </div>
               )}
 
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => setRobloxMode(true)}
-                  className="px-4 py-2 rounded-xl bg-purple-600/30 text-purple-200 border border-purple-500/40 text-xs font-bold"
-                >
-                  🎮 Buka Mode 3D Arena
-                </button>
+              <div className="flex justify-center">
+                {renderPlayerModeSwitcher()}
               </div>
             </div>
           </div>
@@ -932,14 +940,15 @@ export default function PlayerRoom() {
       <>
         {renderFloatingReactions()}
         <div className="max-w-2xl mx-auto py-6 px-4 pb-24 text-center">
-          {/* Roblox 3D Collapse Animation in Result Phase */}
-          {robloxMode && (
+          {/* 3D Collapse / Shatter Animation in Result Phase */}
+          {gameMode !== 'classic' && (
             <div className="mb-6">
               <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
-                <span>🔥 Ubin salah runtuh ke lava! Petak benar bertahan!</span>
+                <span>{gameMode === 'glass_bridge' ? '💥 Kaca salah pecah ke jurang! Jalur benar bersinar!' : '🔥 Ubin salah runtuh ke lava! Petak benar bertahan!'}</span>
               </div>
               <RobloxArena3D
                 phase="REVIEW"
+                arenaMode={gameMode === 'glass_bridge' ? 'glass_bridge' : 'lava_tiles'}
                 localPlayerId={playerId}
                 players={arenaPlayers}
                 correctIndex={resultData.correctIndex}
