@@ -315,16 +315,8 @@ export default function HostRoom() {
 
   const createRoom = (quizId: string) => {
     setErrorMsg(null);
-    let selectedTheme = worldTheme;
-    if (worldTheme === 'arcade') {
-      if (quizId === 'history-ocean-mystery') selectedTheme = 'pirate';
-      else if (quizId === 'general-science') selectedTheme = 'space';
-      else if (quizId === 'brain-teasers-logic') selectedTheme = 'castle';
-      setWorldTheme(selectedTheme);
-    }
-
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode, worldTheme: selectedTheme }));
+      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode, worldTheme }));
     } else {
       pendingCreateQuizIdRef.current = quizId;
       connectWs();
@@ -657,6 +649,30 @@ export default function HostRoom() {
         {/* World Theme Selector Neo-Brutalist */}
         {renderWorldThemeSelector(false)}
 
+        {/* Live 3D World Theme & Mode Preview on SELECT Screen */}
+        {gameMode !== 'classic' && (
+          <div className="mb-10">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <span className="font-['Space_Grotesk',sans-serif] text-sm sm:text-base font-black text-white">
+                  Pratinjau Langsung Arena 3D: {worldTheme === 'pirate' ? '🏝️ Bajak Laut & Samudra Hiu' : worldTheme === 'space' ? '🚀 Stasiun Antariksa' : worldTheme === 'castle' ? '🏰 Kastil Abad Pertengahan' : '🕹️ Arcade Toybox'}
+                </span>
+              </div>
+              <span className="text-xs font-mono text-amber-400 bg-[#151c2c] px-2.5 py-1 rounded border border-black">
+                Klik tombol tema di atas untuk melihat perubahan dunia 3D secara langsung
+              </span>
+            </div>
+            <RobloxArena3D
+              phase="LOBBY"
+              arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+              worldTheme={worldTheme}
+              onChangeTheme={changeWorldTheme}
+              isHost={true}
+              players={[]}
+            />
+          </div>
+        )}
+
         {/* Grid Paket Soal */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {availableQuizzes.map((quiz) => {
@@ -805,6 +821,7 @@ export default function HostRoom() {
                   isHost={true}
                   players={players}
                   worldTheme={worldTheme}
+                  onChangeTheme={changeWorldTheme}
                 />
               </div>
             </div>
@@ -956,6 +973,7 @@ export default function HostRoom() {
                   questionText={currentQuestion.text}
                   timeLeft={timeLeft}
                   worldTheme={worldTheme}
+                  onChangeTheme={changeWorldTheme}
                 />
               </div>
 
