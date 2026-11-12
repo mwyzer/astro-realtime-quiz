@@ -801,7 +801,7 @@ export default function PlayerRoom() {
               />
             </div>
 
-            {/* 4 Interactive Option Buttons (Click or Walk) */}
+            {/* 4 Interactive Isometric Option Tiles (Click or Walk) */}
             <div className="grid grid-cols-2 gap-2.5 mb-2">
               {questionData.options.map((opt, idx) => {
                 const theme = OPTION_THEMES[idx];
@@ -814,10 +814,10 @@ export default function PlayerRoom() {
                     type="button"
                     onClick={() => submitAnswer(idx)}
                     disabled={isHidden}
-                    className={`p-3.5 rounded-xl font-bold transition-all flex items-center justify-between text-left border-2 border-black ${
+                    className={`p-3.5 rounded-xl font-bold transition-all flex items-center justify-between text-left border-2 border-black iso-tile ${
                       isHidden
                         ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800'
-                        : `${theme.bg} ${theme.text} ${isSelected ? 'ring-4 ring-white scale-[1.02] shadow-[5px_5px_0px_#000]' : 'arcade-btn shadow-[3px_3px_0px_#000]'}`
+                        : `${theme.bg} ${theme.text} ${isSelected ? 'ring-4 ring-white scale-[1.03] shadow-[6px_6px_0px_#000]' : 'shadow-[4px_4px_0px_#000]'}`
                     }`}
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -920,7 +920,7 @@ export default function PlayerRoom() {
               </div>
             </div>
 
-            {/* 4 Big Touch Buttons */}
+            {/* 4 Big Isometric Option Tiles */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
               {questionData.options.map((opt, idx) => {
                 const theme = OPTION_THEMES[idx];
@@ -931,10 +931,10 @@ export default function PlayerRoom() {
                     key={idx}
                     onClick={() => submitAnswer(idx)}
                     disabled={isHidden || selectedOption !== null}
-                    className={`w-full py-5 px-4 rounded-xl font-bold border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3 transition-all ${
+                    className={`w-full py-5 px-4 rounded-xl font-bold border-2 border-black iso-tile shadow-[5px_5px_0px_#000] flex items-center gap-3 transition-all ${
                       isHidden
                         ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800'
-                        : `arcade-btn ${theme.bg} ${theme.text}`
+                        : `${theme.bg} ${theme.text}`
                     }`}
                   >
                     <span className="w-9 h-9 rounded bg-black/25 text-white flex items-center justify-center text-xl font-mono shrink-0">

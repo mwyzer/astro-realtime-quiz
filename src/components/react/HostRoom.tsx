@@ -332,10 +332,10 @@ export default function HostRoom() {
                 key={m.id}
                 type="button"
                 onClick={() => setGameMode(m.id)}
-                className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer relative flex flex-col justify-between iso-tile ${
                   isSelected
-                    ? 'bg-amber-400 text-slate-950 shadow-[4px_4px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
-                    : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[2px_2px_0px_#000]'
+                    ? 'bg-amber-400 text-slate-950 shadow-[6px_6px_0px_#000] scale-[1.02]'
+                    : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[4px_4px_0px_#000]'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -810,7 +810,7 @@ export default function HostRoom() {
                 />
               </div>
 
-              {/* 4 Opsi Jawaban Arcade Bar */}
+              {/* 4 Opsi Jawaban Isometric Block Bar */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {currentQuestion.options.map((opt, idx) => {
                   const theme = OPTION_THEMES[idx];
@@ -820,12 +820,12 @@ export default function HostRoom() {
                   return (
                     <div
                       key={idx}
-                      className={`p-3.5 rounded-xl flex flex-col justify-between font-bold transition-all border-2 border-black ${theme.bg} ${theme.text} ${
+                      className={`p-3.5 rounded-xl flex flex-col justify-between font-bold transition-all border-2 border-black iso-tile ${theme.bg} ${theme.text} ${
                         isReview 
                           ? isCorrect
-                            ? 'ring-4 ring-white shadow-[6px_6px_0px_#000] scale-[1.02]'
+                            ? 'ring-4 ring-white shadow-[6px_6px_0px_#000] scale-[1.03]'
                             : 'opacity-30 grayscale-[70%]'
-                          : 'shadow-[3px_3px_0px_#000]'
+                          : 'shadow-[4px_4px_0px_#000]'
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs mb-1 font-mono">
@@ -868,7 +868,7 @@ export default function HostRoom() {
                 )}
               </div>
 
-              {/* 4 Answer Options Classic */}
+              {/* 4 Answer Options Classic Isometric Tiles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {currentQuestion.options.map((opt, idx) => {
                   const theme = OPTION_THEMES[idx];
@@ -878,12 +878,12 @@ export default function HostRoom() {
                   return (
                     <div
                       key={idx}
-                      className={`p-5 rounded-xl flex items-center justify-between font-bold border-2 border-black ${theme.bg} ${theme.text} ${
+                      className={`p-5 rounded-xl flex items-center justify-between font-bold border-2 border-black iso-tile ${theme.bg} ${theme.text} ${
                         isReview 
                           ? isCorrect
                             ? 'ring-4 ring-white shadow-[6px_6px_0px_#000] scale-[1.02] opacity-100'
                             : 'opacity-30 grayscale-[70%]'
-                          : 'shadow-[4px_4px_0px_#000]'
+                          : 'shadow-[5px_5px_0px_#000]'
                       }`}
                     >
                       <div className="flex items-center gap-3">

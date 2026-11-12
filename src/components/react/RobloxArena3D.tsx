@@ -82,6 +82,9 @@ export default function RobloxArena3D({
   });
 
   const [currentStandingZone, setCurrentStandingZone] = useState<number | null>(selectedZone);
+  const [isIsometric, setIsIsometric] = useState(true);
+  const isIsometricRef = useRef(true);
+  isIsometricRef.current = isIsometric;
 
   // Latest props stored in refs for the 60fps render loop
   const phaseRef = useRef(phase);
@@ -164,16 +167,37 @@ export default function RobloxArena3D({
       scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
     }
 
-    const camera = new THREE.PerspectiveCamera(48, width / height, 0.1, 500);
+    // Adaptive Frustum Size for Isometric Orthographic Camera
+    const frustumSize = isBomb ? 20 : (isBridge ? 24 : 22);
+    const aspect = width / height;
+
+    const orthoCamera = new THREE.OrthographicCamera(
+      (-frustumSize * aspect) / 2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      -frustumSize / 2,
+      -100,
+      200
+    );
+
     if (isBridge) {
-      camera.position.set(0, 15.5, 17.5);
-      camera.lookAt(0, -0.6, -0.5);
-    } else if (isBomb) {
-      camera.position.set(0, 20.5, 22.5);
-      camera.lookAt(0, -0.5, 0);
+      orthoCamera.position.set(22, 20, 18);
+      orthoCamera.lookAt(0, 0, -3);
     } else {
-      camera.position.set(0, 20, 23);
-      camera.lookAt(0, -0.5, 0);
+      orthoCamera.position.set(20, 20, 20);
+      orthoCamera.lookAt(0, 0, 0);
+    }
+
+    const perspCamera = new THREE.PerspectiveCamera(48, width / height, 0.1, 500);
+    if (isBridge) {
+      perspCamera.position.set(0, 15.5, 17.5);
+      perspCamera.lookAt(0, -0.6, -0.5);
+    } else if (isBomb) {
+      perspCamera.position.set(0, 20.5, 22.5);
+      perspCamera.lookAt(0, -0.5, 0);
+    } else {
+      perspCamera.position.set(0, 20, 23);
+      perspCamera.lookAt(0, -0.5, 0);
     }
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -183,22 +207,28 @@ export default function RobloxArena3D({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // 2. Lighting
+    // 2. Lighting with Isometric accentuation
     const ambientLight = new THREE.AmbientLight(0xffffff, isBridge ? 0.95 : (isBomb ? 1.05 : 0.85));
     scene.add(ambientLight);
 
+    // Primary directional light placed along the isometric diagonal to highlight top and side faces distinctly
     const dirLight = new THREE.DirectionalLight(0xffffff, isBridge ? 1.4 : (isBomb ? 1.5 : 1.2));
-    dirLight.position.set(16, 28, 16);
+    dirLight.position.set(24, 36, 24);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 100;
-    dirLight.shadow.camera.left = -20;
-    dirLight.shadow.camera.right = 20;
-    dirLight.shadow.camera.top = 20;
-    dirLight.shadow.camera.bottom = -20;
+    dirLight.shadow.camera.far = 120;
+    dirLight.shadow.camera.left = -22;
+    dirLight.shadow.camera.right = 22;
+    dirLight.shadow.camera.top = 22;
+    dirLight.shadow.camera.bottom = -22;
     scene.add(dirLight);
+
+    // Secondary fill light for soft isometric block edges
+    const fillLight = new THREE.DirectionalLight(0x94a3b8, 0.4);
+    fillLight.position.set(-20, 15, -20);
+    scene.add(fillLight);
 
     // Dynamic light underneath
     const underLight = new THREE.PointLight(
@@ -1169,7 +1199,21 @@ export default function RobloxArena3D({
         });
       }
 
-      renderer.render(scene, camera);
+      if (isIsometricRef.current) {
+        if (isBridge) {
+          orthoCamera.position.set(22, 20, 18);
+          orthoCamera.lookAt(0, 0, -3);
+        } else {
+          // Smooth subtle framing offset follow
+          const offsetX = localPosRef.current.x * 0.15;
+          const offsetZ = localPosRef.current.z * 0.15;
+          orthoCamera.position.set(20 + offsetX, 20, 20 + offsetZ);
+          orthoCamera.lookAt(offsetX, 0, offsetZ);
+        }
+      }
+
+      const activeCamera = isIsometricRef.current ? orthoCamera : perspCamera;
+      renderer.render(scene, activeCamera);
     };
 
     animationFrameId = requestAnimationFrame(animate);
@@ -1179,8 +1223,17 @@ export default function RobloxArena3D({
       if (!container) return;
       const w = container.clientWidth;
       const h = container.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      const asp = w / h;
+
+      perspCamera.aspect = asp;
+      perspCamera.updateProjectionMatrix();
+
+      orthoCamera.left = (-frustumSize * asp) / 2;
+      orthoCamera.right = (frustumSize * asp) / 2;
+      orthoCamera.top = frustumSize / 2;
+      orthoCamera.bottom = -frustumSize / 2;
+      orthoCamera.updateProjectionMatrix();
+
       renderer.setSize(w, h);
     };
 
@@ -1210,17 +1263,26 @@ export default function RobloxArena3D({
       {/* 3D WebGL Canvas Container */}
       <div ref={mountRef} className="w-full h-[400px] sm:h-[480px] md:h-[540px] cursor-grab active:cursor-grabbing" />
 
-      {/* Mode Indicator Badge */}
-      <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none z-10">
+      {/* Mode Indicator Badge & Camera Toggle */}
+      <div className="absolute top-3 left-3 flex items-center gap-2 z-20">
         <span className="bg-[#0b0f19] border-2 border-black px-3 py-1 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 uppercase tracking-wider">
           {arenaMode === 'bomb_tag' ? '💣 Estafet Bom 3D' : arenaMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D' : '🌋 Lantai Lava 3D'}
         </span>
+
+        <button
+          type="button"
+          onClick={() => setIsIsometric(prev => !prev)}
+          className="bg-[#0b0f19] hover:bg-slate-800 text-amber-400 border-2 border-black px-3 py-1 rounded-xl text-xs font-mono font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer iso-btn active:translate-x-[1px] active:translate-y-[1px]"
+          title="Ganti Sudut Pandang Kamera (Isometrik / Perspektif)"
+        >
+          <span>{isIsometric ? '📐 Isometrik' : '🎥 Perspektif'}</span>
+        </button>
       </div>
 
       {/* Top HUD Overlay (Question info & timer) */}
       {questionText && (
-        <div className="absolute top-3 left-28 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
-          <div className="bg-[#0b0f19] border-2 border-black px-3.5 py-1.5 rounded-xl shadow-[3px_3px_0px_#000] max-w-lg truncate">
+        <div className="absolute top-3 left-3 right-3 sm:left-auto sm:right-3 flex items-center justify-end gap-2 pointer-events-none z-10">
+          <div className="bg-[#0b0f19] border-2 border-black px-3.5 py-1.5 rounded-xl shadow-[3px_3px_0px_#000] max-w-sm sm:max-w-md md:max-w-lg truncate hidden sm:block">
             <span className="text-xs sm:text-sm font-bold text-white truncate block font-['Space_Grotesk']">
               {questionText}
             </span>
@@ -1295,12 +1357,12 @@ export default function RobloxArena3D({
                 key={idx}
                 type="button"
                 onClick={() => moveToZone(idx)}
-                className={`arcade-btn py-2 px-1 sm:px-2.5 rounded-xl font-black text-xs sm:text-sm text-white border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                className={`iso-tile py-2 px-1 sm:px-2.5 rounded-xl font-black text-xs sm:text-sm text-white border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-1 cursor-pointer ${
                   idx === 0 ? 'bg-red-600 hover:bg-red-500' :
                   idx === 1 ? 'bg-blue-600 hover:bg-blue-500' :
-                  idx === 2 ? 'bg-amber-400 hover:bg-amber-300 text-slate-950' :
+                  idx === 2 ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 font-black' :
                   'bg-emerald-600 hover:bg-emerald-500'
-                } ${isSelected ? 'ring-2 ring-white scale-105 shadow-[3px_3px_0px_#000]' : 'opacity-90'}`}
+                } ${isSelected ? 'ring-2 ring-white scale-105 shadow-[4px_4px_0px_#000]' : 'opacity-90'}`}
                 title={`Lari ke petak ${q.label}`}
               >
                 <span>{q.shape}</span>
@@ -1314,7 +1376,7 @@ export default function RobloxArena3D({
         <button
           type="button"
           onClick={triggerJump}
-          className="arcade-btn bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
+          className="iso-btn bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
         >
           <span>🦘</span>
           <span>Lompat</span>

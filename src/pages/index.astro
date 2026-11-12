@@ -3,45 +3,126 @@ import Layout from '../layouts/Layout.astro';
 import { DEFAULT_QUIZZES } from '../data/default-quizzes';
 ---
 
-<Layout title="Beranda | Platform Kuis Realtime Neo-Brutalist Arcade">
-  <!-- Hero Section Asimetris 2 Kolom -->
-  <section class="py-12 sm:py-16 border-b-2 border-black bg-[#0b0f19]">
-    <div class="max-w-6xl mx-auto px-4">
-      <div class="grid lg:grid-cols-12 gap-8 items-center">
-        <!-- Kolom Kiri: Copywriting Tegas & Aksi Utama -->
+<Layout title="Beranda | Platform Kuis Realtime Isometric Neo-Brutalist Arcade">
+  <!-- Hero Section dengan Pratinjau Papan Diorama Isometrik 3D -->
+  <section class="py-12 sm:py-16 border-b-2 border-black bg-[#0b0f19] relative overflow-hidden">
+    <!-- Isometric Grid Floor Ambient Texture -->
+    <div class="absolute inset-0 iso-grid-floor opacity-35 pointer-events-none"></div>
+
+    <div class="max-w-6xl mx-auto px-4 relative z-10">
+      <div class="grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+        <!-- Kolom Kiri: Copywriting & Diorama Isometrik 3D -->
         <div class="lg:col-span-7 text-left">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-4 uppercase">
+            <span>📐 ISOMETRIC NEO-BRUTALIST TOYBOX</span>
+          </div>
+
           <h1 class="font-['Space_Grotesk',sans-serif] text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.08] mb-5">
-            Kuis Realtime Taktil dengan <span class="text-amber-400 underline decoration-black decoration-4">Arena 3D Roblox</span>
+            Kuis Realtime Taktil dengan <span class="text-amber-400 underline decoration-black decoration-4">Diorama Isometrik 3D</span>
           </h1>
 
-          <p class="text-slate-300 text-base sm:text-lg max-w-xl mb-8 leading-relaxed font-medium">
-            Tinggalkan kuis slide datar yang membosankan. Kendalikan karakter blocky 3D di arena interaktif: estafet bom waktu, tebak jembatan kaca, dan hindari lautan lava bersama seluruh peserta.
+          <p class="text-slate-300 text-base sm:text-lg max-w-xl mb-6 leading-relaxed font-medium">
+            Tinggalkan kuis slide datar yang membosankan. Kendalikan karakter blocky 3D di arena isometrik sejati: estafet bom waktu, tebak jembatan kaca, dan hindari lautan lava bersama seluruh peserta.
           </p>
 
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3 mb-8">
             <a 
               href="/host" 
-              class="px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-base arcade-btn flex items-center gap-2"
+              class="px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-base iso-btn flex items-center gap-2"
             >
               <span>Buka Lobby Host</span>
             </a>
 
             <a 
               href="/bank" 
-              class="px-5 py-3.5 rounded-xl bg-[#151c2c] hover:bg-[#1e293b] text-slate-200 font-bold text-base arcade-btn flex items-center gap-2"
+              class="px-5 py-3.5 rounded-xl bg-[#151c2c] hover:bg-[#1e293b] text-slate-200 font-bold text-base iso-btn flex items-center gap-2"
             >
               <span>Kelola Bank Soal</span>
             </a>
+          </div>
+
+          <!-- Pratinjau Papan Diorama Isometrik 3D Interaktif -->
+          <div class="iso-card p-5 bg-[#151c2c] max-w-xl">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-black">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500 border border-black"></span>
+                <span class="w-3 h-3 rounded-full bg-amber-400 border border-black"></span>
+                <span class="w-3 h-3 rounded-full bg-emerald-500 border border-black"></span>
+                <span class="font-mono text-xs font-black text-white ml-1">PRATINJAU ARENA ISOMETRIK 3D</span>
+              </div>
+              <span class="text-[11px] font-mono text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black font-bold">
+                Kamera 45° Aktif
+              </span>
+            </div>
+
+            <!-- 3D Isometric Diorama Stage Container -->
+            <div class="h-44 sm:h-52 bg-[#090d16] border-2 border-black rounded-xl relative overflow-hidden flex items-center justify-center select-none">
+              <!-- Grid background -->
+              <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+
+              <!-- Perspective Wrapper -->
+              <div class="relative" style="perspective: 800px;">
+                <!-- Rotated Isometric Floor Plane -->
+                <div class="w-48 h-48 sm:w-56 sm:h-56 iso-stage grid grid-cols-2 gap-2 p-2 bg-[#111827] border-2 border-black shadow-[10px_10px_0px_rgba(0,0,0,0.8)] rounded-lg">
+                  <!-- Tile 0: Merah ▲ -->
+                  <div class="iso-tile bg-red-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                    <span>▲</span>
+                    <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI A</span>
+                  </div>
+
+                  <!-- Tile 1: Biru ◆ -->
+                  <div class="iso-tile bg-blue-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                    <span>◆</span>
+                    <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI B</span>
+                  </div>
+
+                  <!-- Tile 2: Kuning ● -->
+                  <div class="iso-tile bg-amber-400 border-2 border-black flex flex-col items-center justify-center text-slate-950 font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                    <span>●</span>
+                    <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI C</span>
+                  </div>
+
+                  <!-- Tile 3: Hijau ■ -->
+                  <div class="iso-tile bg-emerald-600 border-2 border-black flex flex-col items-center justify-center text-white font-black text-base sm:text-lg shadow-[4px_4px_0px_#000] hover:scale-105 transition-transform">
+                    <span>■</span>
+                    <span class="text-[10px] font-mono mt-0.5 opacity-90">OPSI D</span>
+                  </div>
+                </div>
+
+                <!-- Floating Isometric Characters & Bomb -->
+                <div class="absolute -top-6 left-12 animate-bounce pointer-events-none" style="animation-duration: 2s;">
+                  <div class="px-2 py-1 bg-red-600 text-white font-black text-xs rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1 font-mono">
+                    <span>💣🔥</span>
+                    <span>TAG!</span>
+                  </div>
+                </div>
+
+                <div class="absolute -bottom-2 right-12 pointer-events-none">
+                  <div class="px-2 py-0.5 bg-[#0b0f19] text-amber-400 font-mono font-bold text-[11px] rounded border border-black shadow-[2px_2px_0px_#000]">
+                    🦊 Pemain 1
+                  </div>
+                </div>
+              </div>
+
+              <!-- Overlay Hint -->
+              <div class="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[11px] font-mono text-slate-400 pointer-events-none">
+                <span>📍 4 Kuadran Isometrik</span>
+                <span class="text-amber-400">Orthographic Projection</span>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Kolom Kanan: Panel Gabung Cepat (Quick-Join Gamepad) -->
         <div class="lg:col-span-5">
-          <div class="arcade-card p-6 sm:p-7 relative bg-[#151c2c]">
+          <div class="iso-card p-6 sm:p-7 relative bg-[#151c2c]">
             <div class="flex items-center justify-between pb-4 mb-5 border-b-2 border-black">
-              <h2 class="font-['Space_Grotesk',sans-serif] text-lg font-black text-white tracking-tight">
-                Masuk Cepat dengan PIN
-              </h2>
+              <div>
+                <span class="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-1">TERMINAL PESERTA</span>
+                <h2 class="font-['Space_Grotesk',sans-serif] text-xl font-black text-white tracking-tight">
+                  Masuk Cepat dengan PIN
+                </h2>
+              </div>
               <a href="/play" class="text-xs font-mono font-bold bg-[#0b0f19] hover:bg-slate-800 px-2.5 py-1 rounded border border-black text-amber-400 transition-colors">
                 Layar Penuh
               </a>
@@ -59,14 +140,14 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
                   maxlength="6"
                   pattern="[0-9]{6}"
                   placeholder="Contoh: 849201" 
-                  class="w-full bg-[#0b0f19] border-2 border-black rounded-lg px-4 py-3 text-center text-3xl font-mono font-bold tracking-widest text-amber-400 focus:outline-none focus:ring-0 placeholder:text-slate-700"
+                  class="w-full bg-[#0b0f19] border-2 border-black rounded-xl px-4 py-3 text-center text-3xl font-mono font-bold tracking-widest text-amber-400 focus:outline-none focus:border-amber-400 shadow-[3px_3px_0px_#000] placeholder:text-slate-700"
                   required
                 />
               </div>
 
               <button 
                 type="submit" 
-                class="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base arcade-btn"
+                class="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base iso-btn"
               >
                 Gabung ke Room Sekarang
               </button>
@@ -74,17 +155,17 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
 
             <div class="mt-5 pt-4 border-t-2 border-black">
               <p class="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider font-mono">
-                3 Mode Arena 3D di Lobby Host:
+                3 Mode Arena Isometrik di Lobby:
               </p>
               <div class="grid grid-cols-3 gap-2 text-center text-xs font-bold font-mono">
-                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-amber-400 transition-colors">
-                  Estafet Bom
+                <a href="#mode-arena" class="p-2.5 bg-[#0b0f19] hover:bg-slate-800 border-2 border-black rounded-lg text-amber-400 iso-btn transition-colors">
+                  💣 Bom Tag
                 </a>
-                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-blue-400 transition-colors">
-                  Jembatan Kaca
+                <a href="#mode-arena" class="p-2.5 bg-[#0b0f19] hover:bg-slate-800 border-2 border-black rounded-lg text-blue-400 iso-btn transition-colors">
+                  🌉 Kaca 3D
                 </a>
-                <a href="#mode-arena" class="p-2 bg-[#0b0f19] hover:bg-slate-800 border border-black rounded text-red-400 transition-colors">
-                  Lantai Lava
+                <a href="#mode-arena" class="p-2.5 bg-[#0b0f19] hover:bg-slate-800 border-2 border-black rounded-lg text-red-400 iso-btn transition-colors">
+                  🌋 Lava Tiles
                 </a>
               </div>
             </div>
@@ -98,29 +179,32 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
   <section id="mode-arena" class="py-14 sm:py-20 border-b-2 border-black bg-[#0d121f]">
     <div class="max-w-6xl mx-auto px-4">
       <div class="mb-10 text-left">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-2 uppercase">
+          MODE ARENA 3D
+        </div>
         <h2 class="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
-          3 Mode Arena 3D Realtime
+          3 Pilihan Arena Diorama Isometrik
         </h2>
         <p class="text-slate-400 text-sm max-w-2xl font-medium">
-          Setiap mode menghadirkan fisika dan dinamika permainan yang berbeda untuk menjaga adrenalin peserta tetap tinggi.
+          Setiap mode menghadirkan kamera isometrik 45 derajat dengan sudut pandang balok ekstrusi untuk pengalaman visual yang imersif.
         </p>
       </div>
 
       <div class="grid lg:grid-cols-12 gap-6">
         <!-- Kartu Utama: Estafet Bom Waktu (Lebar 7 Kolom) -->
-        <div class="lg:col-span-7 arcade-card p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden bg-[#151c2c]">
+        <div class="lg:col-span-7 iso-card p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden bg-[#151c2c]">
           <div class="flex items-center justify-between gap-3 mb-4">
-            <span class="px-3 py-1 bg-red-600 text-white font-mono font-bold text-xs rounded border border-black">
+            <span class="px-3 py-1 bg-red-600 text-white font-mono font-bold text-xs rounded border-2 border-black shadow-[2px_2px_0px_#000]">
               MODE DEFAULT ARENA
             </span>
-            <span class="font-mono text-xs text-amber-400 font-bold">
+            <span class="font-mono text-xs text-amber-400 font-bold bg-[#0b0f19] px-2.5 py-1 rounded border border-black">
               SURVIVOR BONUS: +300 PTS
             </span>
           </div>
 
           <div>
             <h3 class="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-white mb-3">
-              💣 Estafet Bom Waktu (Hot Potato)
+              💣 Estafet Bom Waktu (Hot Potato 3D)
             </h3>
             <p class="text-slate-300 text-sm sm:text-base leading-relaxed mb-6 font-medium">
               Satu peserta memegang bom berdetak kencang di kepalanya. Untuk membuang bom sebelum waktu habis, pemegang bom harus memilih opsi jawaban yang benar atau menabrak peserta lain secara fisik di arena 3D. Saat timer habis, bom meledak dan melontarkan pemegang bom ke udara!
@@ -128,11 +212,11 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
           </div>
 
           <div class="grid grid-cols-2 gap-3 pt-4 border-t-2 border-black font-mono text-xs text-slate-300">
-            <div class="p-3 bg-[#0b0f19] border border-black rounded">
+            <div class="p-3 bg-[#0b0f19] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000]">
               <strong class="text-amber-400 block mb-0.5">Oper Lewat Jawaban</strong>
               Jawab benar untuk mengoper bom otomatis ke lawan.
             </div>
-            <div class="p-3 bg-[#0b0f19] border border-black rounded">
+            <div class="p-3 bg-[#0b0f19] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000]">
               <strong class="text-amber-400 block mb-0.5">Oper Lewat Tabrakan</strong>
               Dekati lawan dalam radius 1.8 unit untuk transfer bom.
             </div>
@@ -142,37 +226,37 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
         <!-- 2 Kartu Pendamping (Lebar 5 Kolom) -->
         <div class="lg:col-span-5 space-y-6">
           <!-- Kartu Jembatan Kaca -->
-          <div class="arcade-card p-6 bg-[#151c2c]">
+          <div class="iso-card p-6 bg-[#151c2c]">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white">
                 🌉 Jembatan Kaca 3D
               </h4>
-              <span class="text-xs font-mono text-blue-400 font-bold bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+              <span class="text-xs font-mono text-blue-400 font-bold bg-[#0b0f19] px-2.5 py-0.5 rounded border border-black">
                 SQUID TRIVIA
               </span>
             </div>
             <p class="text-slate-300 text-xs sm:text-sm leading-relaxed mb-4 font-medium">
               4 Jalur kaca transparan membentang di atas jurang cyber gelap. Jawaban salah membuat kaca retak dan ambruk, menjatuhkan avatar pemain ke dasar jurang.
             </p>
-            <div class="text-[11px] font-mono text-slate-400 bg-[#0b0f19] p-2 rounded border border-black">
+            <div class="text-[11px] font-mono text-slate-400 bg-[#0b0f19] p-2.5 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000]">
               Mekanik: Jalur benar tetap kokoh hingga tebing finish piala emas.
             </div>
           </div>
 
           <!-- Kartu Lantai Lava -->
-          <div class="arcade-card p-6 bg-[#151c2c]">
+          <div class="iso-card p-6 bg-[#151c2c]">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white">
                 🌋 Lantai Lava 3D
               </h4>
-              <span class="text-xs font-mono text-red-400 font-bold bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+              <span class="text-xs font-mono text-red-400 font-bold bg-[#0b0f19] px-2.5 py-0.5 rounded border border-black">
                 COLOR TILES
               </span>
             </div>
             <p class="text-slate-300 text-xs sm:text-sm leading-relaxed mb-4 font-medium">
               4 Kuadran warna (Merah, Biru, Kuning, Hijau) mengapung di atas samudra lava mendidih. Berlari ke kuadran pilihan sebelum ubin yang salah runtuh ke dalam lava!
             </p>
-            <div class="text-[11px] font-mono text-slate-400 bg-[#0b0f19] p-2 rounded border border-black">
+            <div class="text-[11px] font-mono text-slate-400 bg-[#0b0f19] p-2.5 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000]">
               Mekanik: Platform tengah netral dapat dipakai kembali sebelum jawaban terkunci.
             </div>
           </div>
@@ -186,6 +270,9 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
     <div class="max-w-6xl mx-auto px-4">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-2 uppercase">
+            BANK SOAL
+          </div>
           <h2 class="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-white tracking-tight">
             Paket Soal Siap Main
           </h2>
@@ -195,7 +282,7 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
         </div>
         <a 
           href="/bank" 
-          class="px-4 py-2 rounded-lg bg-[#151c2c] hover:bg-[#1e293b] text-slate-200 font-bold text-xs sm:text-sm arcade-btn"
+          class="px-4 py-2 rounded-xl bg-[#151c2c] hover:bg-[#1e293b] text-slate-200 font-bold text-xs sm:text-sm iso-btn"
         >
           Lihat Bank Soal Lengkap
         </a>
@@ -203,7 +290,7 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
 
       <div class="grid md:grid-cols-2 gap-5">
         {DEFAULT_QUIZZES.map((quiz) => (
-          <div class="arcade-card p-6 flex flex-col justify-between bg-[#151c2c]">
+          <div class="iso-card p-6 flex flex-col justify-between bg-[#151c2c]">
             <div>
               <div class="flex items-center justify-between mb-3">
                 <span class="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider bg-[#0b0f19] px-2.5 py-1 rounded border border-black">
@@ -225,7 +312,7 @@ import { DEFAULT_QUIZZES } from '../data/default-quizzes';
               <span class="text-xs text-slate-400 font-mono">Timer: ~15 detik per soal</span>
               <a 
                 href="/host" 
-                class="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm arcade-btn"
+                class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm iso-btn"
               >
                 Mulai di Host
               </a>
