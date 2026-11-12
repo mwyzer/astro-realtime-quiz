@@ -1206,13 +1206,13 @@ export default function RobloxArena3D({
   );
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden border-2 border-purple-500/40 shadow-2xl bg-slate-950 select-none">
+    <div className="relative w-full rounded-2xl overflow-hidden border-2 border-black shadow-[6px_6px_0px_#000] bg-[#0b0f19] select-none">
       {/* 3D WebGL Canvas Container */}
       <div ref={mountRef} className="w-full h-[400px] sm:h-[480px] md:h-[540px] cursor-grab active:cursor-grabbing" />
 
       {/* Mode Indicator Badge */}
       <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none z-10">
-        <span className="bg-slate-900/90 border border-purple-500/40 px-3 py-1 rounded-xl text-xs font-black text-purple-200 shadow-lg backdrop-blur flex items-center gap-1.5">
+        <span className="bg-[#0b0f19] border-2 border-black px-3 py-1 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 uppercase tracking-wider">
           {arenaMode === 'bomb_tag' ? '💣 Estafet Bom 3D' : arenaMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D' : '🌋 Lantai Lava 3D'}
         </span>
       </div>
@@ -1220,15 +1220,15 @@ export default function RobloxArena3D({
       {/* Top HUD Overlay (Question info & timer) */}
       {questionText && (
         <div className="absolute top-3 left-28 right-3 flex items-center justify-between gap-2 pointer-events-none z-10">
-          <div className="bg-slate-900/90 border border-purple-500/30 px-3.5 py-1.5 rounded-2xl shadow-lg backdrop-blur max-w-lg truncate">
-            <span className="text-xs sm:text-sm font-extrabold text-white truncate block">
+          <div className="bg-[#0b0f19] border-2 border-black px-3.5 py-1.5 rounded-xl shadow-[3px_3px_0px_#000] max-w-lg truncate">
+            <span className="text-xs sm:text-sm font-bold text-white truncate block font-['Space_Grotesk']">
               {questionText}
             </span>
           </div>
 
           {typeof timeLeft === 'number' && (
-            <div className={`px-3 py-1 rounded-xl font-mono font-black text-sm shadow-lg backdrop-blur shrink-0 ${
-              timeLeft <= 5 ? 'bg-red-600/90 text-white animate-pulse' : 'bg-slate-900/90 text-yellow-300 border border-yellow-500/30'
+            <div className={`px-3 py-1 rounded-xl font-mono font-black text-sm border-2 border-black shadow-[3px_3px_0px_#000] shrink-0 ${
+              timeLeft <= 5 ? 'bg-red-600 text-white animate-pulse' : 'bg-amber-400 text-slate-950'
             }`}>
               ⏱️ {timeLeft}s
             </div>
@@ -1240,12 +1240,12 @@ export default function RobloxArena3D({
       {isBombTag && phase === 'QUESTION' && (
         <div className="absolute top-14 left-3 right-3 flex justify-center pointer-events-none z-20">
           {isLocalHoldingBomb ? (
-            <div className="bg-red-600/95 border-2 border-yellow-400 text-white px-4 py-1.5 rounded-2xl font-black text-xs sm:text-sm shadow-2xl backdrop-blur animate-bounce flex items-center gap-2">
+            <div className="bg-red-600 border-2 border-black text-white px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] animate-bounce flex items-center gap-2">
               <span className="text-lg">💣🔥</span>
-              <span>KAMU MEMEGANG BOM! Tabrak pemain lain / jawab benar untuk mengoper!</span>
+              <span>KAMU MEMEGANG BOM! Tabrak pemain lain atau jawab benar untuk mengoper!</span>
             </div>
           ) : (
-            <div className="bg-slate-900/90 border border-emerald-500/60 text-emerald-300 px-4 py-1.5 rounded-2xl font-bold text-xs sm:text-sm shadow-lg backdrop-blur flex items-center gap-2">
+            <div className="bg-[#151c2c] border-2 border-black text-emerald-400 px-4 py-1.5 rounded-xl font-bold text-xs sm:text-sm shadow-[3px_3px_0px_#000] flex items-center gap-2">
               <span className="text-lg">🛡️</span>
               <span>STATUS: AMAN! Jaga jarak dari pemegang bom & pilih petak jawaban!</span>
             </div>
@@ -1256,15 +1256,15 @@ export default function RobloxArena3D({
       {/* Current Standing Zone Indicator */}
       <div className={`absolute left-3 pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24 sm:top-24' : 'top-14'}`}>
         {currentStandingZone !== null && QUADRANT_CONFIGS[currentStandingZone] ? (
-          <div className="bg-slate-900/90 border border-emerald-500/50 px-3 py-1 rounded-xl text-xs font-bold text-emerald-300 shadow-md backdrop-blur flex items-center gap-1.5 animate-bounce-short">
+          <div className="bg-[#151c2c] border-2 border-black px-3 py-1 rounded-xl text-xs font-bold text-white shadow-[2px_2px_0px_#000] flex items-center gap-1.5 animate-bounce-short">
             <span>📍 Petak Dipilih:</span>
-            <span className="text-white bg-black/40 px-2 py-0.5 rounded">
+            <span className="text-amber-400 bg-[#0b0f19] border border-black px-2 py-0.5 rounded font-mono font-black">
               {QUADRANT_CONFIGS[currentStandingZone].shape} {QUADRANT_CONFIGS[currentStandingZone].label}
             </span>
-            <span className="text-[11px] text-gray-300">(Bisa pindah sebelum waktu habis!)</span>
+            <span className="text-[11px] text-slate-300">(Bisa pindah sebelum waktu habis)</span>
           </div>
         ) : (
-          <div className="bg-slate-900/80 border border-slate-700 px-3 py-1 rounded-xl text-[11px] font-bold text-gray-400 shadow-md backdrop-blur">
+          <div className="bg-[#151c2c] border-2 border-black px-3 py-1 rounded-xl text-[11px] font-bold text-slate-400 shadow-[2px_2px_0px_#000]">
             {arenaMode === 'glass_bridge'
               ? '📍 Tebing Awal (Zona Netral)'
               : arenaMode === 'bomb_tag'
@@ -1275,13 +1275,13 @@ export default function RobloxArena3D({
       </div>
 
       {/* Keyboard movement hint */}
-      <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-black/50 px-2.5 py-1 rounded-lg text-[10px] text-gray-300 border border-white/10 pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24' : 'top-14'}`}>
+      <div className={`absolute right-3 hidden md:flex items-center gap-1 bg-[#0b0f19] px-2.5 py-1 rounded-xl text-[11px] text-slate-300 border-2 border-black shadow-[2px_2px_0px_#000] pointer-events-none z-10 ${isBombTag && phase === 'QUESTION' ? 'top-24' : 'top-14'}`}>
         <span>Gunakan</span>
-        <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">W</kbd>
-        <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">A</kbd>
-        <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">S</kbd>
-        <kbd className="bg-slate-800 px-1 rounded font-mono font-bold text-white">D</kbd>
-        <span>/ Arrow & Space</span>
+        <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">W</kbd>
+        <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">A</kbd>
+        <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">S</kbd>
+        <kbd className="bg-[#1e293b] border border-black px-1.5 py-0.5 rounded font-mono font-bold text-amber-400 shadow-[1px_1px_0px_#000]">D</kbd>
+        <span>/ Panah & Spasi</span>
       </div>
 
       {/* Bottom Interactive Quick-Move Dock */}
@@ -1295,12 +1295,12 @@ export default function RobloxArena3D({
                 key={idx}
                 type="button"
                 onClick={() => moveToZone(idx)}
-                className={`py-2 px-1 sm:px-2.5 rounded-xl font-bold text-xs sm:text-sm text-white shadow-lg transition-all flex items-center justify-center gap-1 cursor-pointer transform active:scale-90 ${
+                className={`arcade-btn py-2 px-1 sm:px-2.5 rounded-xl font-black text-xs sm:text-sm text-white border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all flex items-center justify-center gap-1 cursor-pointer ${
                   idx === 0 ? 'bg-red-600 hover:bg-red-500' :
                   idx === 1 ? 'bg-blue-600 hover:bg-blue-500' :
-                  idx === 2 ? 'bg-amber-600 hover:bg-amber-500' :
+                  idx === 2 ? 'bg-amber-400 hover:bg-amber-300 text-slate-950' :
                   'bg-emerald-600 hover:bg-emerald-500'
-                } ${isSelected ? 'ring-4 ring-white scale-105 shadow-2xl' : 'opacity-90'}`}
+                } ${isSelected ? 'ring-2 ring-white scale-105 shadow-[3px_3px_0px_#000]' : 'opacity-90'}`}
                 title={`Lari ke petak ${q.label}`}
               >
                 <span>{q.shape}</span>
@@ -1314,7 +1314,7 @@ export default function RobloxArena3D({
         <button
           type="button"
           onClick={triggerJump}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-90 text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xl border border-purple-400/40 flex items-center gap-1 cursor-pointer transition-all shrink-0"
+          className="arcade-btn bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
         >
           <span>🦘</span>
           <span>Lompat</span>

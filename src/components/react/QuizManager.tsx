@@ -59,8 +59,8 @@ export default function QuizManager() {
           setQuizzes(data);
         }
       }
-    } catch (err) {
-      console.warn('Gagal memuat kuis dari API backend, menggunakan data default lokal.');
+    } catch {
+      // Local default fallback
     } finally {
       setLoading(false);
     }
@@ -257,107 +257,117 @@ export default function QuizManager() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 px-4 font-sans text-slate-100">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold border transition-all animate-bounce-short ${
-          toast.type === 'success' 
-            ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50' 
-            : 'bg-red-950/90 text-red-300 border-red-500/50'
-        }`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+        <div 
+          role="status"
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] flex items-center gap-3 text-sm font-bold transition-all ${
+            toast.type === 'success' 
+              ? 'bg-emerald-500 text-slate-950' 
+              : 'bg-red-500 text-white'
+          }`}
+        >
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0 stroke-[2.5]" /> : <AlertCircle className="w-5 h-5 shrink-0 stroke-[2.5]" />}
           <span>{toast.message}</span>
         </div>
       )}
 
       {/* Header with CTA to Create */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10 pb-6 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b-2 border-black">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#1e293b] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] mb-2 uppercase">
             <Sparkles className="w-3.5 h-3.5" /> Manajemen Bank Soal
-          </span>
-          <h1 className="text-3xl font-extrabold text-white">Bank Soal Kuis</h1>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
+            Bank Soal Kuis
+          </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Buat paket soal baru, edit pertanyaan, atau hapus kuis sesuai kebutuhan Anda.
+            Buat paket soal baru, edit pertanyaan, atau sesuaikan durasi setiap ronde.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-bold px-6 py-3.5 rounded-xl shadow-xl shadow-purple-600/25 transition-all self-start sm:self-auto cursor-pointer"
+          className="arcade-btn inline-flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-6 py-3.5 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#000] transition-all self-start sm:self-auto cursor-pointer"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-5 h-5 stroke-[3]" />
           <span>Buat Paket Kuis Baru</span>
         </button>
       </div>
 
       {/* Quiz List Cards */}
-      <div className="space-y-8">
+      <div className="space-y-6">
         {quizzes.map((quiz) => (
           <div 
             key={quiz.id}
-            className="bg-slate-900/60 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 sm:p-8 backdrop-blur transition-all shadow-xl"
+            className="arcade-card bg-[#151c2c] border-2 border-black rounded-2xl p-6 sm:p-8 shadow-[4px_4px_0px_#000]"
           >
             {/* Top row of card: metadata and action buttons */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b-2 border-black">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-xs uppercase font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs uppercase font-mono font-bold text-amber-400 bg-[#1e293b] border-2 border-black px-2.5 py-0.5 rounded shadow-[1px_1px_0px_#000]">
                     {quiz.category || 'Umum'}
                   </span>
-                  <span className="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-0.5 rounded-full">
+                  <span className="text-xs text-slate-200 font-mono font-bold bg-[#0b0f19] border-2 border-black px-2.5 py-0.5 rounded shadow-[1px_1px_0px_#000]">
                     {quiz.questions.length} Pertanyaan
                   </span>
                 </div>
-                <h2 className="text-2xl font-black text-white">{quiz.title}</h2>
+                <h2 className="text-2xl font-bold text-white font-['Space_Grotesk'] tracking-tight">
+                  {quiz.title}
+                </h2>
                 <p className="text-slate-300 text-sm mt-1">{quiz.description}</p>
               </div>
 
               {/* Action buttons (Edit, Delete, Host) */}
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
+                  type="button"
                   onClick={() => handleOpenEdit(quiz)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="arcade-btn px-4 py-2 rounded-xl bg-[#1e293b] hover:bg-slate-700 text-white text-xs font-bold border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Edit Paket Kuis"
                 >
-                  <Edit3 className="w-4 h-4 text-purple-400" />
+                  <Edit3 className="w-4 h-4 text-amber-400" />
                   <span>Edit</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => handleDeleteQuiz(quiz.id)}
-                  className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 hover:text-red-200 text-xs font-bold border border-red-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="arcade-btn px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Hapus Paket Kuis"
                 >
-                  <Trash2 className="w-4 h-4 text-red-400" />
+                  <Trash2 className="w-4 h-4 text-white" />
                   <span>Hapus</span>
                 </button>
 
                 <a
                   href="/host"
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-purple-600/20 transition-all"
+                  className="arcade-btn px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] flex items-center gap-1.5 transition-all"
                 >
                   <span>Host Sekarang</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
                 </a>
               </div>
             </div>
 
             {/* Questions Preview Accordion */}
             <div className="mt-6">
-              <h3 className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-4">
+              <h3 className="text-xs uppercase font-mono font-bold text-slate-400 tracking-wider mb-4">
                 Daftar Soal ({quiz.questions.length}):
               </h3>
               <div className="grid gap-3">
                 {quiz.questions.map((q, idx) => (
-                  <div key={q.id || idx} className="bg-slate-800/40 border border-slate-800 p-4 rounded-2xl flex items-start gap-4">
-                    <span className="w-7 h-7 bg-purple-500/20 text-purple-300 font-mono font-bold rounded-lg flex items-center justify-center shrink-0 text-xs">
+                  <div key={q.id || idx} className="bg-[#0b0f19] border-2 border-black p-4 rounded-xl shadow-[2px_2px_0px_#000] flex items-start gap-3">
+                    <span className="w-7 h-7 bg-amber-400 text-slate-950 font-mono font-black border-2 border-black rounded flex items-center justify-center shrink-0 text-xs shadow-[1px_1px_0px_#000]">
                       {idx + 1}
                     </span>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <p className="text-white font-medium text-sm">{q.text}</p>
-                        <span className="text-[11px] font-mono text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 shrink-0">
+                        <p className="text-white font-bold text-sm">{q.text}</p>
+                        <span className="text-[11px] font-mono font-bold text-amber-300 bg-[#151c2c] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000] shrink-0">
                           ⏱ {q.timeLimit || 15}s
                         </span>
                       </div>
@@ -365,16 +375,16 @@ export default function QuizManager() {
                         {q.options.map((opt, oIdx) => (
                           <div 
                             key={oIdx}
-                            className={`p-2 rounded-lg flex items-center gap-2 ${
+                            className={`p-2.5 rounded-lg border-2 flex items-center gap-2 ${
                               oIdx === q.correctIndex 
-                                ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 font-semibold' 
-                                : 'bg-slate-900/60 text-slate-400'
+                                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500 font-bold' 
+                                : 'bg-[#151c2c] text-slate-300 border-black'
                             }`}
                           >
-                            <span className="font-mono">{['▲','◆','●','■'][oIdx]}</span>
-                            <span>{opt}</span>
+                            <span className="font-mono font-black">{['▲','◆','●','■'][oIdx]}</span>
+                            <span className="truncate">{opt}</span>
                             {oIdx === q.correctIndex && (
-                              <span className="ml-auto text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">
+                              <span className="ml-auto text-[10px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.5 rounded border border-black">
                                 Kunci Benar
                               </span>
                             )}
@@ -382,7 +392,7 @@ export default function QuizManager() {
                         ))}
                       </div>
                       {q.explanation && (
-                        <p className="mt-2 text-[11px] text-purple-300/80 bg-purple-950/30 p-2 rounded-lg border border-purple-500/20">
+                        <p className="mt-2 text-xs text-slate-300 bg-[#151c2c] p-2.5 rounded-lg border border-black">
                           💡 <em>{q.explanation}</em>
                         </p>
                       )}
@@ -398,11 +408,11 @@ export default function QuizManager() {
       {/* MODAL / DRAWER: CREATE & UPDATE EDITOR */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-purple-500/30 rounded-3xl w-full max-w-3xl my-8 p-6 sm:p-8 shadow-2xl relative max-h-[90vh] flex flex-col">
+          <div className="bg-[#151c2c] border-2 border-black rounded-2xl w-full max-w-3xl my-8 p-6 sm:p-8 shadow-[8px_8px_0px_#000] relative max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+            <div className="flex items-center justify-between pb-4 border-b-2 border-black shrink-0">
               <div>
-                <h2 className="text-2xl font-black text-white">
+                <h2 className="text-2xl font-black text-white font-['Space_Grotesk'] tracking-tight">
                   {editingQuizId ? 'Edit Paket Kuis' : 'Buat Paket Kuis Baru'}
                 </h2>
                 <p className="text-slate-400 text-xs mt-1">
@@ -412,7 +422,8 @@ export default function QuizManager() {
               <button
                 type="button"
                 onClick={() => setIsEditorOpen(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="arcade-btn p-2 text-slate-300 hover:text-white rounded-xl bg-[#1e293b] hover:bg-slate-700 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] transition-colors"
+                aria-label="Tutup editor modal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -423,27 +434,29 @@ export default function QuizManager() {
               {/* Quiz Info */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  <label htmlFor="quiz-title-input" className="block text-xs font-mono font-bold uppercase tracking-wider text-amber-400 mb-1.5">
                     Judul Kuis *
                   </label>
                   <input
+                    id="quiz-title-input"
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Contoh: Kuis Dasar Python, Trivia Musik"
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none transition-all placeholder:text-slate-500"
+                    className="w-full bg-[#0b0f19] border-2 border-black focus:border-amber-400 focus:outline-none rounded-xl px-4 py-2.5 text-white font-medium text-sm shadow-[2px_2px_0px_#000] transition-all placeholder:text-slate-500"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                  <label htmlFor="quiz-category-select" className="block text-xs font-mono font-bold uppercase tracking-wider text-amber-400 mb-1.5">
                     Kategori
                   </label>
                   <select
+                    id="quiz-category-select"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none transition-all"
+                    className="w-full bg-[#0b0f19] border-2 border-black focus:border-amber-400 focus:outline-none rounded-xl px-4 py-2.5 text-white font-medium text-sm shadow-[2px_2px_0px_#000] transition-all"
                   >
                     {CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -453,33 +466,34 @@ export default function QuizManager() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                <label htmlFor="quiz-description-input" className="block text-xs font-mono font-bold uppercase tracking-wider text-amber-400 mb-1.5">
                   Deskripsi Kuis
                 </label>
                 <input
+                  id="quiz-description-input"
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Deskripsi singkat seputar materi kuis"
-                  className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none transition-all placeholder:text-slate-500"
+                  className="w-full bg-[#0b0f19] border-2 border-black focus:border-amber-400 focus:outline-none rounded-xl px-4 py-2.5 text-white font-medium text-sm shadow-[2px_2px_0px_#000] transition-all placeholder:text-slate-500"
                 />
               </div>
 
               {/* Questions Section */}
-              <div className="pt-4 border-t border-slate-800">
+              <div className="pt-4 border-t-2 border-black">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white font-['Space_Grotesk'] flex items-center gap-2">
                     <span>Daftar Pertanyaan</span>
-                    <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full font-mono">
+                    <span className="text-xs bg-[#0b0f19] text-amber-400 border-2 border-black px-2.5 py-0.5 rounded-full font-mono font-bold shadow-[1px_1px_0px_#000]">
                       {questions.length}
                     </span>
                   </h3>
                   <button
                     type="button"
                     onClick={handleAddQuestion}
-                    className="px-3.5 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    className="arcade-btn px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-4 h-4 stroke-[3]" />
                     <span>Tambah Soal</span>
                   </button>
                 </div>
@@ -488,21 +502,23 @@ export default function QuizManager() {
                   {questions.map((q, qIdx) => (
                     <div 
                       key={q.id || qIdx} 
-                      className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 relative"
+                      className="bg-[#0b0f19] border-2 border-black rounded-xl p-5 shadow-[3px_3px_0px_#000] relative"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="font-mono text-xs font-bold text-purple-300 bg-purple-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="font-mono text-xs font-black text-slate-950 bg-amber-400 border-2 border-black px-2.5 py-1 rounded shadow-[1px_1px_0px_#000]">
                           Soal #{qIdx + 1}
                         </span>
 
                         <div className="flex items-center gap-3">
                           {/* Time limit selector */}
-                          <div className="flex items-center gap-1 text-xs text-slate-300">
-                            <Clock className="w-3.5 h-3.5 text-yellow-400" />
+                          <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                            <Clock className="w-4 h-4 text-amber-400" />
+                            <label htmlFor={`question-time-${qIdx}`} className="sr-only">Durasi Soal {qIdx + 1}</label>
                             <select
+                              id={`question-time-${qIdx}`}
                               value={q.timeLimit || 15}
                               onChange={(e) => handleTimeLimitChange(qIdx, Number(e.target.value))}
-                              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white outline-none"
+                              className="bg-[#151c2c] border-2 border-black rounded-lg px-2 py-1 text-xs text-white font-mono font-bold shadow-[1px_1px_0px_#000] outline-none"
                             >
                               {TIME_LIMITS.map(t => (
                                 <option key={t} value={t}>{t} detik</option>
@@ -514,8 +530,9 @@ export default function QuizManager() {
                           <button
                             type="button"
                             onClick={() => handleRemoveQuestion(qIdx)}
-                            className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg transition-colors"
+                            className="arcade-btn p-1.5 text-white bg-red-600 hover:bg-red-500 border-2 border-black rounded-lg shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-colors cursor-pointer"
                             title="Hapus Soal Ini"
+                            aria-label={`Hapus Soal ${qIdx + 1}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -523,56 +540,65 @@ export default function QuizManager() {
                       </div>
 
                       {/* Question text input */}
-                      <input
-                        type="text"
-                        value={q.text}
-                        onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
-                        placeholder={`Tulis pertanyaan nomor ${qIdx + 1}...`}
-                        className="w-full bg-slate-900 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-2.5 text-white text-sm outline-none mb-4"
-                        required
-                      />
+                      <div className="mb-4">
+                        <label htmlFor={`question-text-${qIdx}`} className="sr-only">Teks Pertanyaan {qIdx + 1}</label>
+                        <input
+                          id={`question-text-${qIdx}`}
+                          type="text"
+                          value={q.text}
+                          onChange={(e) => handleQuestionTextChange(qIdx, e.target.value)}
+                          placeholder={`Tulis pertanyaan nomor ${qIdx + 1}...`}
+                          className="w-full bg-[#151c2c] border-2 border-black focus:border-amber-400 focus:outline-none rounded-xl px-4 py-2.5 text-white font-medium text-sm shadow-[2px_2px_0px_#000]"
+                          required
+                        />
+                      </div>
 
                       {/* 4 Options Grid */}
-                      <p className="text-xs font-bold text-slate-400 mb-2">
-                        Pilihan Jawaban (Klik tombol lingkaran untuk menandai kunci jawaban yang benar):
+                      <p className="text-xs font-mono font-bold text-amber-400 mb-2 uppercase">
+                        Pilihan Jawaban (Klik tombol simbol untuk menandai kunci benar):
                       </p>
 
                       <div className="grid sm:grid-cols-2 gap-3 mb-4">
                         {q.options.map((opt, optIdx) => {
                           const isCorrect = q.correctIndex === optIdx;
                           const shapeTheme = [
-                            { symbol: '▲', color: 'text-red-400', border: 'border-red-500/40' },
-                            { symbol: '◆', color: 'text-blue-400', border: 'border-blue-500/40' },
-                            { symbol: '●', color: 'text-amber-400', border: 'border-amber-500/40' },
-                            { symbol: '■', color: 'text-emerald-400', border: 'border-emerald-500/40' }
+                            { symbol: '▲', color: 'bg-red-600 text-white' },
+                            { symbol: '◆', color: 'bg-blue-600 text-white' },
+                            { symbol: '●', color: 'bg-amber-400 text-slate-950 font-black' },
+                            { symbol: '■', color: 'bg-emerald-600 text-white' }
                           ][optIdx];
 
                           return (
                             <div 
                               key={optIdx} 
-                              className={`flex items-center gap-2 bg-slate-900/90 border rounded-xl p-2 transition-all ${
-                                isCorrect ? 'border-emerald-500 ring-1 ring-emerald-500/50 bg-emerald-950/20' : 'border-slate-700'
+                              className={`flex items-center gap-2 bg-[#151c2c] border-2 rounded-xl p-2 transition-all ${
+                                isCorrect 
+                                  ? 'border-emerald-500 shadow-[2px_2px_0px_#10b981]' 
+                                  : 'border-black shadow-[2px_2px_0px_#000]'
                               }`}
                             >
                               <button
                                 type="button"
                                 onClick={() => handleCorrectIndexChange(qIdx, optIdx)}
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-transform ${
+                                className={`w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center font-black text-xs shrink-0 transition-transform ${
                                   isCorrect 
-                                    ? 'bg-emerald-500 text-white scale-105' 
-                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    ? 'bg-emerald-500 text-slate-950 shadow-[1px_1px_0px_#000]' 
+                                    : `${shapeTheme.color} shadow-[1px_1px_0px_#000] hover:opacity-90`
                                 }`}
                                 title={isCorrect ? 'Kunci Benar' : 'Jadikan Kunci Benar'}
+                                aria-label={`Pilih Opsi ${['A', 'B', 'C', 'D'][optIdx]} sebagai kunci benar`}
                               >
                                 {isCorrect ? <Check className="w-4 h-4 stroke-[3]" /> : shapeTheme.symbol}
                               </button>
 
+                              <label htmlFor={`question-${qIdx}-opt-${optIdx}`} className="sr-only">{`Opsi ${['A', 'B', 'C', 'D'][optIdx]}`}</label>
                               <input
+                                id={`question-${qIdx}-opt-${optIdx}`}
                                 type="text"
                                 value={opt}
                                 onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
                                 placeholder={`Opsi ${['A', 'B', 'C', 'D'][optIdx]}`}
-                                className="w-full bg-transparent text-white text-xs outline-none px-2 py-1"
+                                className="w-full bg-transparent text-white font-medium text-xs outline-none px-2 py-1"
                                 required
                               />
                             </div>
@@ -582,12 +608,14 @@ export default function QuizManager() {
 
                       {/* Explanation input */}
                       <div>
+                        <label htmlFor={`question-expl-${qIdx}`} className="sr-only">Penjelasan Jawaban Soal {qIdx + 1}</label>
                         <input
+                          id={`question-expl-${qIdx}`}
                           type="text"
                           value={q.explanation || ''}
                           onChange={(e) => handleExplanationChange(qIdx, e.target.value)}
                           placeholder="Penjelasan jawaban setelah waktu habis (opsional)"
-                          className="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl px-3 py-2 text-slate-300 text-xs outline-none"
+                          className="w-full bg-[#151c2c] border-2 border-black focus:border-amber-400 focus:outline-none rounded-xl px-3 py-2 text-slate-300 text-xs shadow-[2px_2px_0px_#000]"
                         />
                       </div>
                     </div>
@@ -596,19 +624,19 @@ export default function QuizManager() {
               </div>
 
               {/* Form Submission Buttons */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3 shrink-0">
+              <div className="pt-4 border-t-2 border-black flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsEditorOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold transition-colors"
+                  className="arcade-btn px-5 py-2.5 rounded-xl bg-[#1e293b] hover:bg-slate-700 text-slate-200 text-sm font-bold border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_#000] transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all cursor-pointer"
+                  className="arcade-btn px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#000] flex items-center gap-2 transition-all cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="w-4 h-4 stroke-[2.5]" />
                   <span>Simpan Paket Kuis</span>
                 </button>
               </div>

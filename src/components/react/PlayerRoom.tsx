@@ -13,10 +13,10 @@ const AVATARS = ['🦊', '🐯', '🚀', '🐼', '👾', '🦄', '⚡', '🥑', 
 const REACTION_EMOJIS = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
 
 const OPTION_THEMES = [
-  { bg: 'bg-red-500', active: 'active:bg-red-600', ring: 'ring-red-400', shape: '▲', label: 'Merah' },
-  { bg: 'bg-blue-500', active: 'active:bg-blue-600', ring: 'ring-blue-400', shape: '◆', label: 'Biru' },
-  { bg: 'bg-amber-500', active: 'active:bg-amber-600', ring: 'ring-amber-400', shape: '●', label: 'Kuning' },
-  { bg: 'bg-emerald-500', active: 'active:bg-emerald-600', ring: 'ring-emerald-400', shape: '■', label: 'Hijau' },
+  { bg: 'bg-[#ef4444]', text: 'text-white', shape: '▲', label: 'Merah' },
+  { bg: 'bg-[#2563eb]', text: 'text-white', shape: '◆', label: 'Biru' },
+  { bg: 'bg-[#eab308]', text: 'text-slate-950', shape: '●', label: 'Kuning' },
+  { bg: 'bg-[#10b981]', text: 'text-slate-950', shape: '■', label: 'Hijau' },
 ];
 
 interface FloatingReaction {
@@ -238,16 +238,16 @@ export default function PlayerRoom() {
         const isMe = msg.bombHolderId === playerId;
         const wasMe = msg.fromName === name;
         const reasonDesc = msg.reason === 'correct_answer' 
-          ? 'jawaban benar 🎯' 
+          ? 'jawaban benar' 
           : msg.reason === 'physical_tag' 
-          ? 'tabrakan fisik 💥' 
-          : 'operan bot 🤖';
+          ? 'tabrakan fisik' 
+          : 'operan bot';
         setBombToast({
           text: isMe 
-            ? `🔥 AWAS! Kamu menerima BOM dari ${msg.fromName}!` 
+            ? `AWAS! Kamu menerima BOM dari ${msg.fromName}!` 
             : wasMe 
-            ? `✨ Sukses mengoper bom ke ${msg.toName}!` 
-            : `💣 Estafet Bom: ${msg.fromName} ➔ ${msg.toName} (${reasonDesc})`,
+            ? `Sukses mengoper bom ke ${msg.toName}!` 
+            : `Estafet Bom: ${msg.fromName} ke ${msg.toName} (${reasonDesc})`,
           id: Date.now()
         });
         sound.playPop();
@@ -372,63 +372,59 @@ export default function PlayerRoom() {
         avatar
       }));
     } else {
-      setErrorMsg('Koneksi belum siap. Silakan tunggu sebentar.');
+      setErrorMsg('Tidak terhubung ke server.');
     }
   };
 
-  const submitAnswer = (optionIndex: number) => {
-    if (phase !== 'QUESTION' && phase !== 'SUBMITTED') return;
-    setSelectedOption(optionIndex);
+  const submitAnswer = (index: number) => {
+    if (selectedOption !== null && phase === 'SUBMITTED' && gameMode === 'classic') return;
+    setSelectedOption(index);
 
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'SUBMIT_ANSWER',
-        code: roomCode,
-        playerId,
-        answerIndex: optionIndex
+        answerIndex: index
       }));
     }
+    sound.playPop();
   };
 
   const handlePlayerMove = (x: number, z: number, jumping: boolean, zoneIndex: number | null) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'PLAYER_MOVE',
-        code: roomCode,
-        playerId,
         x,
         z,
         jumping,
         answerIndex: zoneIndex
       }));
     }
+    if (zoneIndex !== null && zoneIndex !== selectedOption) {
+      setSelectedOption(zoneIndex);
+    }
+  };
+
+  const useFiftyFifty = () => {
+    if (!fiftyFiftyLeft || hiddenOptions.length > 0) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'USE_FIFTY_FIFTY' }));
+    }
+  };
+
+  const useDoublePoints = () => {
+    if (!doublePointsLeft || activeDouble) return;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'USE_DOUBLE_POINTS' }));
+    }
   };
 
   const sendReaction = (emoji: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
       wsRef.current.send(JSON.stringify({
         type: 'SEND_REACTION',
         emoji
       }));
       sound.playPop();
-    }
-  };
-
-  const useFiftyFifty = () => {
-    if (!fiftyFiftyLeft || phase !== 'QUESTION' || hiddenOptions.length > 0) return;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
-      wsRef.current.send(JSON.stringify({
-        type: 'USE_FIFTY_FIFTY'
-      }));
-    }
-  };
-
-  const useDoublePoints = () => {
-    if (!doublePointsLeft || phase !== 'QUESTION' || activeDouble) return;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
-      wsRef.current.send(JSON.stringify({
-        type: 'USE_DOUBLE_POINTS'
-      }));
     }
   };
 
@@ -466,10 +462,10 @@ export default function PlayerRoom() {
                 animation: 'floatUpReaction 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards',
               }}
             >
-              <span className="text-4xl md:text-5xl filter drop-shadow-lg">
+              <span className="text-4xl md:text-5xl filter drop-shadow-md">
                 {r.emoji}
               </span>
-              <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900/80 text-white border border-white/20 shadow-lg backdrop-blur whitespace-nowrap">
+              <span className="mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold font-mono bg-slate-950 text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] whitespace-nowrap">
                 {r.senderAvatar} {r.senderName}
               </span>
             </div>
@@ -481,8 +477,8 @@ export default function PlayerRoom() {
 
   const renderReactionDock = () => {
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/90 border border-purple-500/30 backdrop-blur-md px-3 py-2 rounded-2xl shadow-2xl flex items-center gap-1 sm:gap-2">
-        <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider px-2 hidden sm:inline">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-[#111827] border-2 border-black px-3 py-2 rounded-xl shadow-[4px_4px_0px_#000] flex items-center gap-1.5 sm:gap-2">
+        <span className="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider px-2 hidden sm:inline">
           Reaksi:
         </span>
         {REACTION_EMOJIS.map((emoji) => (
@@ -490,7 +486,7 @@ export default function PlayerRoom() {
             key={emoji}
             type="button"
             onClick={() => sendReaction(emoji)}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/80 hover:bg-purple-600/30 active:scale-90 transition-all flex items-center justify-center text-xl sm:text-2xl border border-white/10 hover:border-purple-400/50 shadow-sm cursor-pointer"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all flex items-center justify-center text-xl sm:text-2xl cursor-pointer"
             title={`Kirim ${emoji}`}
           >
             {emoji}
@@ -503,8 +499,8 @@ export default function PlayerRoom() {
   const renderBombToast = () => {
     if (!bombToast) return null;
     return (
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
-        <div className="bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-xs sm:text-sm px-4 py-2 rounded-2xl shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+        <div className="bg-red-600 text-white font-black text-xs sm:text-sm px-4 py-2 rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] flex items-center gap-2">
           <span>{bombToast.text}</span>
         </div>
       </div>
@@ -520,22 +516,25 @@ export default function PlayerRoom() {
     ];
 
     return (
-      <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 rounded-xl shadow-lg backdrop-blur">
-        {modes.map(m => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setGameMode(m.id)}
-            className={`px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              gameMode === m.id
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-gray-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <span>{m.icon}</span>
-            <span className="hidden sm:inline">{m.label}</span>
-          </button>
-        ))}
+      <div className="flex items-center gap-1 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+        {modes.map(m => {
+          const isSelected = gameMode === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setGameMode(m.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                isSelected
+                  ? 'bg-amber-400 text-slate-950 border-black shadow-[1px_1px_0px_#000]'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
+              }`}
+            >
+              <span>{m.icon}</span>
+              <span className="hidden sm:inline">{m.label}</span>
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -544,27 +543,27 @@ export default function PlayerRoom() {
   if (phase === 'JOIN') {
     return (
       <div className="max-w-md mx-auto py-8 px-4">
-        <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl">
+        <div className="arcade-card p-6 sm:p-8 bg-[#151c2c]">
           <div className="text-center mb-6">
-            <div className="w-14 h-14 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-purple-500/20">
-              <Gamepad2 className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 bg-amber-400 text-slate-950 rounded-xl flex items-center justify-center mx-auto mb-3 border-2 border-black shadow-[3px_3px_0px_#000]">
+              <Gamepad2 className="w-7 h-7" />
             </div>
             <div className="flex items-center justify-center gap-1.5 mb-2">
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold border ${
                 wsConnected 
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' 
-                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30 animate-pulse'
+                  ? 'bg-emerald-500 text-slate-950 border-black' 
+                  : 'bg-amber-400 text-slate-950 border-black'
               }`}>
-                <Radio className="w-2.5 h-2.5" />
-                {wsConnected ? 'Server Online' : 'Menghubungkan Server...'}
+                <Radio className="w-3 h-3" />
+                {wsConnected ? 'Server Online' : 'Connecting...'}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white">Gabung Permainan</h2>
-            <p className="text-gray-400 text-xs mt-1">Masukkan PIN kuis dari layar Host untuk bergabung</p>
+            <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-black text-white">Gabung Permainan</h2>
+            <p className="text-slate-400 text-xs mt-1 font-medium">Masukkan PIN 6 digit dari layar Host untuk memulai</p>
           </div>
 
           {errorMsg && (
-            <div className="mb-4 p-3 bg-red-950/60 border border-red-500/50 rounded-xl text-red-200 text-xs flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-950/70 border-2 border-red-500 rounded-xl text-red-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -572,49 +571,51 @@ export default function PlayerRoom() {
 
           <form onSubmit={joinRoom} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-1.5">
+              <label htmlFor="player-pin" className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                 PIN Kuis (6 Digit)
               </label>
               <input
+                id="player-pin"
                 type="text"
                 maxLength={6}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="123456"
-                className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-3 text-center text-2xl font-mono font-bold tracking-widest text-white outline-none transition-all placeholder:text-gray-600"
+                className="w-full bg-[#0b0f19] border-2 border-black rounded-lg px-4 py-3 text-center text-3xl font-mono font-bold tracking-widest text-amber-400 focus:outline-none focus:ring-0 placeholder:text-slate-700"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-1.5">
+              <label htmlFor="player-name" className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                 Nama Panggilan
               </label>
               <input
+                id="player-name"
                 type="text"
                 maxLength={12}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Contoh: Budi, Sarah"
-                className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-xl px-4 py-3 text-white font-medium outline-none transition-all placeholder:text-gray-600"
+                className="w-full bg-[#0b0f19] border-2 border-black rounded-lg px-4 py-3 text-white font-bold text-base focus:outline-none focus:ring-0 placeholder:text-slate-600"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-2">
-                Pilih Avatar
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Pilih Avatar Pemain
               </label>
-              <div className="flex flex-wrap gap-2 justify-center bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
+              <div className="flex flex-wrap gap-2 justify-center bg-[#0b0f19] p-3 rounded-xl border-2 border-black">
                 {AVATARS.map((emoji) => (
                   <button
                     type="button"
                     key={emoji}
                     onClick={() => setAvatar(emoji)}
-                    className={`text-2xl p-2 rounded-xl transition-transform ${
+                    className={`text-2xl p-2 rounded-lg transition-transform border-2 ${
                       avatar === emoji 
-                        ? 'bg-purple-600 scale-110 shadow-lg shadow-purple-600/40 ring-2 ring-white' 
-                        : 'hover:bg-slate-700'
+                        ? 'bg-amber-400 text-slate-950 border-black shadow-[2px_2px_0px_#000] scale-110' 
+                        : 'border-transparent hover:bg-slate-800'
                     }`}
                   >
                     {emoji}
@@ -626,10 +627,10 @@ export default function PlayerRoom() {
             <button
               type="submit"
               disabled={!wsConnected}
-              className="w-full mt-4 bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-black py-3.5 px-4 rounded-xl shadow-xl shadow-purple-600/30 transition-all flex items-center justify-center gap-2"
+              className="w-full mt-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3.5 px-4 rounded-xl arcade-btn flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
-              <span>Masuk Room</span>
+              <span>Masuk Room Kuis</span>
             </button>
           </form>
         </div>
@@ -644,14 +645,14 @@ export default function PlayerRoom() {
         {renderFloatingReactions()}
         {renderBombToast()}
         <div className="max-w-2xl mx-auto py-8 px-4 pb-24 text-center">
-          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl">
+          <div className="arcade-card p-6 sm:p-8 bg-[#151c2c]">
             {/* Top Player Status & Mode Switch */}
-            <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b border-slate-800">
+            <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b-2 border-black">
               <div className="flex items-center gap-3 text-left">
-                <span className="text-4xl">{avatar}</span>
+                <span className="text-4xl p-2 bg-[#0b0f19] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000]">{avatar}</span>
                 <div>
-                  <h2 className="text-xl font-black text-white">{name}</h2>
-                  <p className="text-purple-300 text-xs font-mono">Room PIN: {roomCode}</p>
+                  <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-black text-white">{name}</h2>
+                  <p className="text-amber-400 text-xs font-mono font-bold">ROOM PIN: {roomCode}</p>
                 </div>
               </div>
 
@@ -661,25 +662,27 @@ export default function PlayerRoom() {
             {/* 3D Roblox Interactive Arena in Lobby */}
             {gameMode !== 'classic' && (
               <div className="mb-6">
-                <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
-                  <span>{gameMode === 'bomb_tag' ? '💣 Latihan Estafet Bom (Gunakan WASD / Tombol Bawah)' : gameMode === 'glass_bridge' ? '🌉 Latihan Jembatan Kaca (Gunakan WASD / Tombol Bawah)' : '🌋 Latihan Lantai Lava (Gunakan WASD / Tombol Bawah)'}</span>
+                <div className="text-xs font-mono font-bold text-amber-400 mb-2 flex items-center justify-center gap-1.5">
+                  <span>{gameMode === 'bomb_tag' ? 'Latihan Estafet Bom (WASD / Tombol Arah)' : gameMode === 'glass_bridge' ? 'Latihan Jembatan Kaca (WASD / Tombol Arah)' : 'Latihan Lantai Lava (WASD / Tombol Arah)'}</span>
                 </div>
-                <RobloxArena3D
-                  phase="LOBBY"
-                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
-                  bombHolderId={bombHolderId}
-                  explodedPlayerId={explodedPlayerId}
-                  localPlayerId={playerId}
-                  players={arenaPlayers}
-                  onMove={handlePlayerMove}
-                />
+                <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
+                  <RobloxArena3D
+                    phase="LOBBY"
+                    arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                    bombHolderId={bombHolderId}
+                    explodedPlayerId={explodedPlayerId}
+                    localPlayerId={playerId}
+                    players={arenaPlayers}
+                    onMove={handlePlayerMove}
+                  />
+                </div>
               </div>
             )}
 
-            <div className="py-5 px-4 bg-slate-800/80 rounded-2xl border border-slate-700">
-              <div className="inline-block w-7 h-7 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mb-2" />
-              <p className="text-white font-bold text-sm">Kamu sudah bergabung!</p>
-              <p className="text-gray-400 text-xs mt-1">Perhatikan layar Host. Kuis akan segera dimulai...</p>
+            <div className="py-5 px-4 bg-[#0b0f19] rounded-xl border-2 border-black">
+              <div className="inline-block w-6 h-6 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-2" />
+              <p className="text-white font-bold text-sm">Kamu sudah bergabung di room!</p>
+              <p className="text-slate-400 text-xs mt-1 font-medium">Perhatikan layar Host. Permainan akan segera dimulai...</p>
             </div>
           </div>
         </div>
@@ -694,9 +697,9 @@ export default function PlayerRoom() {
       <>
         {renderFloatingReactions()}
         <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
-          <span className="text-purple-300 text-xs uppercase tracking-widest font-bold mb-2">Bersiaplah</span>
-          <h2 className="text-3xl font-extrabold text-white mb-6">Pertanyaan Segera Tiba!</h2>
-          <div className="w-24 h-24 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-5xl font-black text-white animate-ping">
+          <span className="text-amber-400 text-xs font-mono font-bold uppercase tracking-widest mb-2">BERSIAPLAH</span>
+          <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-black text-white mb-6">Pertanyaan Segera Hadir!</h2>
+          <div className="w-24 h-24 bg-amber-400 text-slate-950 rounded-2xl border-4 border-black shadow-[6px_6px_0px_#000] flex items-center justify-center text-5xl font-black font-mono">
             🚀
           </div>
         </div>
@@ -706,7 +709,6 @@ export default function PlayerRoom() {
 
   // 4. Question & Submitted Phase
   if ((phase === 'QUESTION' || phase === 'SUBMITTED') && questionData) {
-    // If in 3D Arena Mode (Glass Bridge or Lava Tiles), players stay in the arena during both QUESTION and SUBMITTED
     if (gameMode !== 'classic') {
       return (
         <>
@@ -714,22 +716,22 @@ export default function PlayerRoom() {
           {renderBombToast()}
           <div className="max-w-3xl mx-auto py-3 px-3 sm:px-4 pb-24">
             {/* Top Bar Info & Mode Switcher */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-gray-300 bg-slate-900/80 p-3 rounded-2xl border border-slate-800 backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-300 bg-[#151c2c] p-3 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
               <div className="flex items-center gap-2">
-                <span className="font-bold bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
-                  Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
+                <span className="font-mono font-bold bg-[#0b0f19] px-2.5 py-1 rounded text-amber-400 border border-black">
+                  SOAL {questionData.questionIndex + 1}/{questionData.totalQuestions}
                 </span>
                 {renderPlayerModeSwitcher()}
               </div>
 
               <div className="flex items-center gap-3">
                 {selectedOption !== null && (
-                  <span className="hidden sm:inline-block text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
-                    ✓ Terpilih: {OPTION_THEMES[selectedOption].shape} {OPTION_THEMES[selectedOption].label}
+                  <span className="hidden sm:inline-block text-[11px] font-mono font-bold text-emerald-400 bg-[#0b0f19] border border-black px-2 py-0.5 rounded">
+                    ✓ TERPILIH: {OPTION_THEMES[selectedOption].shape} {OPTION_THEMES[selectedOption].label}
                   </span>
                 )}
                 <span className={`font-mono font-bold text-sm sm:text-base flex items-center gap-1 ${
-                  timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
+                  timeLeft <= 5 ? 'text-red-500 font-black' : 'text-amber-400'
                 }`}>
                   <Clock className="w-4 h-4" /> {timeLeft}s
                 </span>
@@ -737,14 +739,14 @@ export default function PlayerRoom() {
             </div>
 
             {/* Power-Up Lifelines Bar */}
-            <div className="bg-slate-900/80 border border-purple-500/30 p-2.5 rounded-2xl mb-3 backdrop-blur shadow-lg">
+            <div className="bg-[#151c2c] border-2 border-black p-3 rounded-xl mb-3 shadow-[2px_2px_0px_#000]">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-[11px] font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-400" /> Power-Up Lifelines
+                <span className="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> POWER-UP LIFELINES:
                 </span>
                 {activeDouble && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                    🔥 2x Poin Aktif!
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-400 text-slate-950 border border-black">
+                    2x POIN AKTIF!
                   </span>
                 )}
               </div>
@@ -753,36 +755,36 @@ export default function PlayerRoom() {
                   type="button"
                   onClick={useFiftyFifty}
                   disabled={!fiftyFiftyLeft || hiddenOptions.length > 0}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 border-2 border-black ${
                     fiftyFiftyLeft && hiddenOptions.length === 0
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
-                      : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                      ? 'bg-[#2563eb] hover:bg-blue-500 text-white shadow-[2px_2px_0px_#000] arcade-btn'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
                   }`}
                 >
                   <span>✂️ 50:50</span>
-                  <span className="text-[10px] opacity-80">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                  <span className="text-[10px] opacity-90">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={useDoublePoints}
                   disabled={!doublePointsLeft || activeDouble}
-                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 border-2 border-black ${
                     doublePointsLeft && !activeDouble
-                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
+                      ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-[2px_2px_0px_#000] arcade-btn'
                       : activeDouble
-                      ? 'bg-amber-500 text-black border-amber-300 font-extrabold animate-pulse'
-                      : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                      ? 'bg-amber-400 text-slate-950 font-black'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
                   }`}
                 >
                   <span>🚀 2x Poin</span>
-                  <span className="text-[10px] opacity-80">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                  <span className="text-[10px] opacity-90">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
                 </button>
               </div>
             </div>
 
             {/* 3D Roblox Arena */}
-            <div className="mb-3">
+            <div className="mb-3 border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
               <RobloxArena3D
                 phase="QUESTION"
                 arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
@@ -800,7 +802,7 @@ export default function PlayerRoom() {
             </div>
 
             {/* 4 Interactive Option Buttons (Click or Walk) */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-2 gap-2.5 mb-2">
               {questionData.options.map((opt, idx) => {
                 const theme = OPTION_THEMES[idx];
                 const isHidden = hiddenOptions.includes(idx);
@@ -812,23 +814,23 @@ export default function PlayerRoom() {
                     type="button"
                     onClick={() => submitAnswer(idx)}
                     disabled={isHidden}
-                    className={`p-3 rounded-xl font-bold text-white shadow transition-all flex items-center justify-between text-left border ${
+                    className={`p-3.5 rounded-xl font-bold transition-all flex items-center justify-between text-left border-2 border-black ${
                       isHidden
-                        ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800 border-slate-700'
-                        : `${theme.bg} ${isSelected ? 'ring-4 ring-white border-white scale-[1.02] shadow-xl' : 'opacity-90 border-transparent active:scale-95'}`
+                        ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800'
+                        : `${theme.bg} ${theme.text} ${isSelected ? 'ring-4 ring-white scale-[1.02] shadow-[5px_5px_0px_#000]' : 'arcade-btn shadow-[3px_3px_0px_#000]'}`
                     }`}
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="w-7 h-7 rounded-lg bg-black/20 flex items-center justify-center text-sm font-mono shrink-0">
+                      <span className="w-7 h-7 rounded bg-black/25 text-white flex items-center justify-center text-xs font-mono shrink-0">
                         {theme.shape}
                       </span>
-                      <span className="text-xs sm:text-sm font-semibold truncate leading-tight">
+                      <span className="text-xs sm:text-sm font-bold truncate leading-tight">
                         {opt}
                       </span>
                     </div>
                     {isSelected && (
-                      <span className="text-[10px] font-black bg-white text-black px-1.5 py-0.5 rounded ml-1 shrink-0">
-                        ✓ DIPILIH
+                      <span className="text-[10px] font-mono font-black bg-black text-amber-400 px-1.5 py-0.5 rounded ml-1 shrink-0">
+                        DIPILIH
                       </span>
                     )}
                   </button>
@@ -836,8 +838,8 @@ export default function PlayerRoom() {
               })}
             </div>
 
-            <p className="text-center text-[11px] text-gray-400">
-              💡 Gerakkan karakter ke jalur/petak pilihan atau tekan tombol warna di atas. Kamu masih bisa berpindah sebelum waktu habis!
+            <p className="text-center text-[11px] font-mono text-slate-400">
+              Gerakkan karakter ke petak pilihan atau klik tombol warna di atas sebelum waktu habis.
             </p>
           </div>
           {renderReactionDock()}
@@ -851,37 +853,36 @@ export default function PlayerRoom() {
         <>
           {renderFloatingReactions()}
           <div className="max-w-lg mx-auto py-4 px-4 pb-24 flex flex-col min-h-[85vh] justify-between">
-            {/* Top bar info */}
             <div>
-              <div className="flex items-center justify-between mb-3 text-xs text-gray-300">
+              <div className="flex items-center justify-between mb-3 text-xs text-slate-300">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                    Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
+                  <span className="font-mono font-bold bg-[#0b0f19] px-3 py-1 rounded text-amber-400 border border-black">
+                    SOAL {questionData.questionIndex + 1}/{questionData.totalQuestions}
                   </span>
                   {renderPlayerModeSwitcher()}
                 </div>
                 <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
-                  timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
+                  timeLeft <= 5 ? 'text-red-500 font-black' : 'text-amber-400'
                 }`}>
                   <Clock className="w-4 h-4" /> {timeLeft}s
                 </span>
               </div>
 
-              <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl mb-4 text-center">
-                <p className="text-lg font-bold text-white leading-snug">
+              <div className="arcade-card p-5 mb-4 text-center bg-[#151c2c]">
+                <p className="font-['Space_Grotesk',sans-serif] text-lg font-bold text-white leading-snug">
                   {questionData.text}
                 </p>
               </div>
 
-              {/* Power-Up Lifelines Bar */}
-              <div className="bg-slate-900/80 border border-purple-500/30 p-3 rounded-2xl mb-4 backdrop-blur shadow-lg">
+              {/* Power-Up Lifelines Bar Classic */}
+              <div className="bg-[#151c2c] border-2 border-black p-3 rounded-xl mb-4 shadow-[2px_2px_0px_#000]">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-yellow-400" /> Power-Up Lifelines
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> POWER-UP LIFELINES:
                   </span>
                   {activeDouble && (
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                      🔥 2x Poin Aktif!
+                    <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-amber-400 text-slate-950 border border-black">
+                      2x POIN AKTIF!
                     </span>
                   )}
                 </div>
@@ -890,30 +891,30 @@ export default function PlayerRoom() {
                     type="button"
                     onClick={useFiftyFifty}
                     disabled={!fiftyFiftyLeft || hiddenOptions.length > 0 || selectedOption !== null}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 border-2 border-black ${
                       fiftyFiftyLeft && hiddenOptions.length === 0 && selectedOption === null
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
-                        : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                        ? 'bg-[#2563eb] hover:bg-blue-500 text-white shadow-[2px_2px_0px_#000] arcade-btn'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
                     }`}
                   >
                     <span>✂️ 50:50</span>
-                    <span className="text-[10px] opacity-80">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                    <span className="text-[10px] opacity-90">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={useDoublePoints}
                     disabled={!doublePointsLeft || activeDouble || selectedOption !== null}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 border-2 border-black ${
                       doublePointsLeft && !activeDouble && selectedOption === null
-                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
+                        ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-[2px_2px_0px_#000] arcade-btn'
                         : activeDouble
-                        ? 'bg-amber-500 text-black border-amber-300 font-extrabold animate-pulse'
-                        : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                        ? 'bg-amber-400 text-slate-950 font-black'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
                     }`}
                   >
                     <span>🚀 2x Poin</span>
-                    <span className="text-[10px] opacity-80">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                    <span className="text-[10px] opacity-90">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
                   </button>
                 </div>
               </div>
@@ -930,16 +931,16 @@ export default function PlayerRoom() {
                     key={idx}
                     onClick={() => submitAnswer(idx)}
                     disabled={isHidden || selectedOption !== null}
-                    className={`w-full py-6 px-4 rounded-2xl font-bold text-white shadow-xl flex items-center gap-3.5 transition-all transform ${
+                    className={`w-full py-5 px-4 rounded-xl font-bold border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3 transition-all ${
                       isHidden
-                        ? 'opacity-20 pointer-events-none line-through grayscale cursor-not-allowed scale-95 bg-slate-800 border border-slate-700'
-                        : `active:scale-95 cursor-pointer ${theme.bg} ${theme.active}`
+                        ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800'
+                        : `arcade-btn ${theme.bg} ${theme.text}`
                     }`}
                   >
-                    <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl font-mono shrink-0">
+                    <span className="w-9 h-9 rounded bg-black/25 text-white flex items-center justify-center text-xl font-mono shrink-0">
                       {theme.shape}
                     </span>
-                    <span className="text-left text-base sm:text-lg leading-tight font-semibold flex-1">
+                    <span className="text-left text-base leading-tight font-bold flex-1">
                       {opt}
                     </span>
                   </button>
@@ -947,8 +948,8 @@ export default function PlayerRoom() {
               })}
             </div>
 
-            <p className="text-center text-xs text-gray-500 mt-3 mb-2">
-              Pilih salah satu jawaban secepat mungkin untuk poin lebih tinggi!
+            <p className="text-center text-xs text-slate-400 mt-3 mb-2 font-mono">
+              Pilih jawaban secepat mungkin untuk skor kecepatan tertinggi.
             </p>
           </div>
           {renderReactionDock()}
@@ -964,15 +965,15 @@ export default function PlayerRoom() {
         <>
           {renderFloatingReactions()}
           <div className="max-w-md mx-auto py-16 px-4 pb-24 text-center">
-            <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-              <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="arcade-card p-8 bg-[#151c2c]">
+              <div className="w-16 h-16 bg-amber-400 text-slate-950 border-2 border-black rounded-xl flex items-center justify-center mx-auto mb-4 shadow-[3px_3px_0px_#000]">
                 <Send className="w-8 h-8" />
               </div>
-              <h2 className="text-2xl font-extrabold text-white mb-2">Jawaban Terkirim!</h2>
-              <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
+              <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-black text-white mb-2">Jawaban Terkirim!</h2>
+              <p className="text-slate-400 text-xs mb-6 font-medium">Menunggu peserta lain dan waktu soal berakhir...</p>
 
               {chosenTheme && (
-                <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg mb-6`}>
+                <div className={`p-4 rounded-xl font-bold border-2 border-black ${chosenTheme.bg} ${chosenTheme.text} inline-flex items-center gap-2 shadow-[3px_3px_0px_#000] mb-6`}>
                   <span>{chosenTheme.shape}</span>
                   <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
                 </div>
@@ -999,68 +1000,70 @@ export default function PlayerRoom() {
           {/* 3D Collapse / Shatter / Explosion Animation in Result Phase */}
           {gameMode !== 'classic' && (
             <div className="mb-6">
-              <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
-                <span>{gameMode === 'bomb_tag' ? '💥 KABOOM! Bom meledak & melontarkan pemegang bom!' : gameMode === 'glass_bridge' ? '💥 Kaca salah pecah ke jurang! Jalur benar bersinar!' : '🔥 Ubin salah runtuh ke lava! Petak benar bertahan!'}</span>
+              <div className="text-xs font-mono font-bold text-amber-400 mb-2 flex items-center justify-center gap-1.5">
+                <span>{gameMode === 'bomb_tag' ? 'KABOOM! Bom meledak & melontarkan pemegang bom!' : gameMode === 'glass_bridge' ? 'Kaca salah pecah ke jurang! Jalur benar bersinar!' : 'Ubin salah runtuh ke lava! Petak benar bertahan!'}</span>
               </div>
-              <RobloxArena3D
-                phase="REVIEW"
-                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
-                bombHolderId={bombHolderId}
-                explodedPlayerId={explodedPlayerId}
-                localPlayerId={playerId}
-                players={arenaPlayers}
-                correctIndex={resultData.correctIndex}
-                options={questionData?.options}
-                questionText={questionData?.text}
-              />
+              <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
+                <RobloxArena3D
+                  phase="REVIEW"
+                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  bombHolderId={bombHolderId}
+                  explodedPlayerId={explodedPlayerId}
+                  localPlayerId={playerId}
+                  players={arenaPlayers}
+                  correctIndex={resultData.correctIndex}
+                  options={questionData?.options}
+                  questionText={questionData?.text}
+                />
+              </div>
             </div>
           )}
 
-          <div className={`rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl border ${
+          <div className={`arcade-card p-6 sm:p-8 ${
             resultData.exploded
-              ? 'bg-red-950/80 border-red-500 shadow-red-600/30 ring-2 ring-red-500'
+              ? 'bg-red-950 border-red-500'
               : resultData.isCorrect 
-              ? 'bg-emerald-950/60 border-emerald-500/50' 
-              : 'bg-red-950/60 border-red-500/50'
+              ? 'bg-emerald-950 border-emerald-500' 
+              : 'bg-red-950 border-red-500'
           }`}>
             {resultData.exploded ? (
               <div>
-                <span className="text-6xl animate-bounce block mb-2">💥💣</span>
-                <h2 className="text-2xl sm:text-3xl font-black text-red-400">KABOOM! BOM MELEDAK!</h2>
-                <p className="text-red-300 font-bold text-sm mt-1">Kamu memegang bom saat waktu habis! 0 poin di ronde ini.</p>
+                <span className="text-6xl block mb-2">💥💣</span>
+                <h2 className="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-red-400">KABOOM! BOM MELEDAK!</h2>
+                <p className="text-red-200 font-bold text-sm mt-1">Kamu memegang bom saat waktu habis. 0 poin di ronde ini.</p>
               </div>
             ) : resultData.isCorrect ? (
               <div>
-                <CheckCircle2 className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-400 mx-auto mb-3 animate-bounce" />
-                <h2 className="text-2xl sm:text-3xl font-black text-white">BENAR! 🎉</h2>
-                <p className="text-emerald-300 font-mono text-2xl font-bold mt-2">
+                <CheckCircle2 className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-400 mx-auto mb-3" />
+                <h2 className="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-white">BENAR! 🎉</h2>
+                <p className="text-emerald-300 font-mono text-2xl font-black mt-2">
                   +{resultData.pointsEarned} pts
                 </p>
                 {resultData.streak > 1 && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-amber-300 text-xs font-bold mt-3">
-                    <Flame className="w-4 h-4 fill-current" />
-                    <span>{resultData.streak}x Beruntun!</span>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#0b0f19] border-2 border-black rounded-lg text-amber-400 text-xs font-mono font-bold mt-3">
+                    <Flame className="w-4 h-4 fill-current text-amber-400" />
+                    <span>{resultData.streak}x Streak Beruntun!</span>
                   </div>
                 )}
               </div>
             ) : (
               <div>
                 <XCircle className="w-16 h-16 sm:w-20 sm:h-20 text-red-400 mx-auto mb-3" />
-                <h2 className="text-2xl sm:text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
-                <p className="text-red-300 text-sm mt-2">
+                <h2 className="font-['Space_Grotesk',sans-serif] text-2xl sm:text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
+                <p className="text-red-200 text-sm mt-2 font-medium">
                   Jawaban benar: <strong>{questionData?.options[resultData.correctIndex]}</strong>
                 </p>
               </div>
             )}
 
-            <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-around text-center">
+            <div className="mt-6 pt-6 border-t-2 border-black flex items-center justify-around text-center">
               <div>
-                <span className="text-xs uppercase text-gray-400 font-bold block">Peringkatmu</span>
+                <span className="text-xs uppercase font-mono text-slate-400 font-bold block">Peringkatmu</span>
                 <span className="text-2xl font-black text-white font-mono">#{resultData.rank}</span>
               </div>
               <div>
-                <span className="text-xs uppercase text-gray-400 font-bold block">Total Skor</span>
-                <span className="text-2xl font-black text-purple-300 font-mono">{resultData.totalScore}</span>
+                <span className="text-xs uppercase font-mono text-slate-400 font-bold block">Total Skor</span>
+                <span className="text-2xl font-black text-amber-400 font-mono">{resultData.totalScore}</span>
               </div>
             </div>
           </div>
@@ -1076,22 +1079,22 @@ export default function PlayerRoom() {
       <>
         {renderFloatingReactions()}
         <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
-          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-            <Award className="w-20 h-20 text-yellow-400 mx-auto mb-4 animate-bounce" />
-            <h2 className="text-3xl font-black text-white">Permainan Selesai!</h2>
-            <p className="text-gray-400 text-xs mt-1 mb-6">Hebat, kamu telah menyelesaikan seluruh pertanyaan!</p>
+          <div className="arcade-card p-8 bg-[#151c2c]">
+            <Award className="w-16 h-16 text-amber-400 mx-auto mb-3" />
+            <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-black text-white">Permainan Selesai!</h2>
+            <p className="text-slate-400 text-xs mt-1 mb-6 font-medium">Seluruh pertanyaan kuis telah selesai dijawab.</p>
 
-            <div className="p-6 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
-              <span className="text-xs uppercase text-gray-400 font-bold">Peringkat Akhirmu</span>
-              <p className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400 my-2 font-mono">
+            <div className="p-6 bg-[#0b0f19] rounded-xl border-2 border-black mb-6">
+              <span className="text-xs uppercase font-mono text-slate-400 font-bold">Peringkat Akhirmu</span>
+              <p className="text-5xl font-black text-amber-400 my-2 font-mono">
                 #{finalRank.rank}
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-slate-400 font-mono">
                 dari total {finalRank.totalPlayers} peserta
               </p>
-              <div className="mt-4 pt-4 border-t border-slate-700">
-                <span className="text-xs text-gray-400">Total Skor Akhir</span>
-                <p className="text-2xl font-mono font-bold text-purple-300">{finalRank.score} pts</p>
+              <div className="mt-4 pt-4 border-t-2 border-black">
+                <span className="text-xs font-mono text-slate-400">Total Skor Akhir</span>
+                <p className="text-2xl font-mono font-black text-amber-400">{finalRank.score} pts</p>
               </div>
             </div>
 
@@ -1100,7 +1103,7 @@ export default function PlayerRoom() {
                 setPhase('JOIN');
                 setPin('');
               }}
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all"
+              className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3.5 px-4 rounded-xl arcade-btn"
             >
               Main Lagi di Room Baru
             </button>

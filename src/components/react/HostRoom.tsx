@@ -6,15 +6,15 @@ import confetti from 'canvas-confetti';
 import RobloxArena3D from './RobloxArena3D';
 import { 
   Users, Play, ArrowRight, Trophy, RotateCcw, 
-  Copy, Check, Clock, Sparkles, Volume2, VolumeX, ShieldAlert,
-  Radio, CheckCircle2, Flame, Zap
+  Copy, Check, Clock, Volume2, VolumeX, ShieldAlert,
+  Radio, Zap
 } from 'lucide-react';
 
 const OPTION_THEMES = [
-  { bg: 'bg-red-500', hover: 'hover:bg-red-600', ring: 'ring-red-400', shape: '▲', label: 'Merah' },
-  { bg: 'bg-blue-500', hover: 'hover:bg-blue-600', ring: 'ring-blue-400', shape: '◆', label: 'Biru' },
-  { bg: 'bg-amber-500', hover: 'hover:bg-amber-600', ring: 'ring-amber-400', shape: '●', label: 'Kuning' },
-  { bg: 'bg-emerald-500', hover: 'hover:bg-emerald-600', ring: 'ring-emerald-400', shape: '■', label: 'Hijau' },
+  { bg: 'bg-[#ef4444]', text: 'text-white', shape: '▲', label: 'Merah' },
+  { bg: 'bg-[#2563eb]', text: 'text-white', shape: '◆', label: 'Biru' },
+  { bg: 'bg-[#eab308]', text: 'text-slate-950', shape: '●', label: 'Kuning' },
+  { bg: 'bg-[#10b981]', text: 'text-slate-950', shape: '■', label: 'Hijau' },
 ];
 
 const REACTION_EMOJIS = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
@@ -36,7 +36,6 @@ export default function HostRoom() {
   const [quizMeta, setQuizMeta] = useState<{ title: string; count: number }>({ title: '', count: 0 });
   const [phase, setPhase] = useState<'SELECT' | 'LOBBY' | 'COUNTDOWN' | 'QUESTION' | 'REVIEW' | 'FINISHED'>('SELECT');
   
-  // Pre-fill available quizzes with DEFAULT_QUIZZES so cards are visible immediately
   const [availableQuizzes, setAvailableQuizzes] = useState(
     DEFAULT_QUIZZES.map(q => ({
       id: q.id,
@@ -65,9 +64,7 @@ export default function HostRoom() {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Connect to WS server & load quizzes
   useEffect(() => {
-    // 1. Fetch latest quizzes from REST API
     const isDevPort = typeof window !== 'undefined' && window.location.port === '4321';
     const apiUrl = isDevPort ? `http://${window.location.hostname}:3001/api/quizzes` : '/api/quizzes';
 
@@ -85,7 +82,6 @@ export default function HostRoom() {
       })
       .catch(() => {});
 
-    // 2. Connect WebSocket
     const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = (import.meta as any).env?.PUBLIC_WS_URL || (
       isDevPort 
@@ -99,7 +95,6 @@ export default function HostRoom() {
     ws.onopen = () => {
       setWsConnected(true);
       setErrorMsg(null);
-      // Ask for quiz list
       ws.send(JSON.stringify({ type: 'GET_QUIZZES' }));
     };
 
@@ -194,12 +189,12 @@ export default function HostRoom() {
       case 'BOMB_PASSED': {
         setBombHolderId(msg.bombHolderId);
         const reasonDesc = msg.reason === 'correct_answer' 
-          ? 'jawaban benar 🎯' 
+          ? 'jawaban benar' 
           : msg.reason === 'physical_tag' 
-          ? 'tabrakan/sentuhan fisik 💥' 
-          : 'operan bot 🤖';
+          ? 'tabrakan fisik' 
+          : 'operan bot';
         setBombToast({
-          text: `💣 Estafet Bom: ${msg.fromName} ➔ ${msg.toName} (${reasonDesc})`,
+          text: `Estafet Bom: ${msg.fromName} ke ${msg.toName} (${reasonDesc})`,
           id: Date.now()
         });
         sound.playPop();
@@ -238,6 +233,8 @@ export default function HostRoom() {
         setPlayers(msg.players || []);
         setAnswerStats(null);
         setCurrentQuestion(null);
+        setBombHolderId(null);
+        setExplodedPlayerId(null);
         break;
 
       case 'EMOJI_REACTION': {
@@ -259,13 +256,13 @@ export default function HostRoom() {
 
       case 'POWERUP_USED': {
         setPowerupToast({
-          text: `⚡ ${msg.playerAvatar} ${msg.playerName} menggunakan ${msg.powerupName}!`,
+          text: `${msg.playerAvatar} ${msg.playerName} aktifkan ${msg.powerupName}!`,
           id: Date.now()
         });
         sound.playPop();
         setTimeout(() => {
-          setPowerupToast(null);
-        }, 3500);
+          setPowerupToast(null), 3500;
+        });
         break;
       }
 
@@ -298,33 +295,36 @@ export default function HostRoom() {
 
     if (compact) {
       return (
-        <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 p-1 rounded-2xl shadow-lg backdrop-blur">
-          {modes.map(m => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => changeGameMode(m.id)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                gameMode === m.id
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'text-gray-400 hover:text-white hover:bg-slate-800'
-              }`}
-              title={m.desc}
-            >
-              <span>{m.icon}</span>
-              <span className="hidden sm:inline">{m.label}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+          {modes.map(m => {
+            const isSelected = gameMode === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => changeGameMode(m.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-amber-400 text-slate-950 border-black shadow-[1px_1px_0px_#000]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800 border-transparent'
+                }`}
+                title={m.desc}
+              >
+                <span>{m.icon}</span>
+                <span className="hidden md:inline">{m.label}</span>
+              </button>
+            );
+          })}
         </div>
       );
     }
 
     return (
       <div className="mb-8">
-        <h3 className="text-sm font-extrabold text-purple-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <span>🎮 Pilih Mode Permainan Live:</span>
+        <h3 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>PILIH MODE PERMAINAN ARENA:</span>
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {modes.map(m => {
             const isSelected = gameMode === m.id;
             return (
@@ -332,23 +332,23 @@ export default function HostRoom() {
                 key={m.id}
                 type="button"
                 onClick={() => setGameMode(m.id)}
-                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex items-start gap-3.5 ${
+                className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer relative flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-gradient-to-br from-purple-900/70 to-indigo-900/70 border-purple-400 shadow-xl shadow-purple-600/25 ring-2 ring-purple-400/60'
-                    : 'bg-slate-800/60 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
+                    ? 'bg-amber-400 text-slate-950 shadow-[4px_4px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                    : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[2px_2px_0px_#000]'
                 }`}
               >
-                <span className="text-3xl shrink-0 p-2 rounded-2xl bg-black/40 border border-white/10">{m.icon}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl p-1.5 rounded-lg bg-black/10 border border-black/20">{m.icon}</span>
+                  {isSelected && (
+                    <span className="text-[10px] bg-black text-amber-400 font-mono font-black px-2 py-0.5 rounded">
+                      AKTIF
+                    </span>
+                  )}
+                </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-extrabold text-white text-sm sm:text-base">{m.label}</h4>
-                    {isSelected && (
-                      <span className="text-[10px] bg-purple-500 text-white font-black px-2 py-0.5 rounded-full shadow-sm">
-                        AKTIF
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-300 leading-snug">{m.desc}</p>
+                  <h4 className="font-['Space_Grotesk',sans-serif] font-black text-sm mb-1">{m.label}</h4>
+                  <p className="text-xs opacity-90 leading-snug">{m.desc}</p>
                 </div>
               </button>
             );
@@ -424,10 +424,10 @@ export default function HostRoom() {
                 animation: 'floatUpReaction 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards',
               }}
             >
-              <span className="text-4xl md:text-5xl filter drop-shadow-lg">
+              <span className="text-4xl md:text-5xl filter drop-shadow-md">
                 {r.emoji}
               </span>
-              <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900/80 text-white border border-white/20 shadow-lg backdrop-blur whitespace-nowrap">
+              <span className="mt-1 px-2.5 py-0.5 rounded-md text-xs font-bold font-mono bg-slate-950 text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000] whitespace-nowrap">
                 {r.senderAvatar} {r.senderName}
               </span>
             </div>
@@ -449,8 +449,8 @@ export default function HostRoom() {
 
   const renderReactionDock = () => {
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-purple-500/40 backdrop-blur-md px-3 py-2 rounded-2xl shadow-2xl flex items-center gap-1 sm:gap-2">
-        <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider px-2 hidden sm:inline">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-[#111827] border-2 border-black px-3 py-2 rounded-xl shadow-[4px_4px_0px_#000] flex items-center gap-1.5 sm:gap-2">
+        <span className="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider px-2 hidden sm:inline">
           Host Reaction:
         </span>
         {REACTION_EMOJIS.map((emoji) => (
@@ -458,7 +458,7 @@ export default function HostRoom() {
             key={emoji}
             type="button"
             onClick={() => sendReaction(emoji)}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800/80 hover:bg-purple-600/30 active:scale-90 transition-all flex items-center justify-center text-xl sm:text-2xl border border-white/10 hover:border-purple-400/50 shadow-sm cursor-pointer"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-[#1e293b] hover:bg-amber-400 text-white hover:text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all flex items-center justify-center text-xl sm:text-2xl cursor-pointer"
             title={`Kirim ${emoji}`}
           >
             {emoji}
@@ -472,15 +472,15 @@ export default function HostRoom() {
     return (
       <>
         {powerupToast && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
-            <div className="bg-gradient-to-r from-amber-500 to-purple-600 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-amber-400 text-slate-950 font-black text-sm px-4 py-2 rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] flex items-center gap-2">
               <span>{powerupToast.text}</span>
             </div>
           </div>
         )}
         {bombToast && (
-          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-bounce-short">
-            <div className="bg-gradient-to-r from-red-600 to-amber-500 text-white font-extrabold text-sm sm:text-base px-5 py-2.5 rounded-full shadow-2xl border border-white/30 backdrop-blur flex items-center gap-2">
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-red-600 text-white font-black text-sm px-4 py-2 rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] flex items-center gap-2">
               <span>{bombToast.text}</span>
             </div>
           </div>
@@ -492,11 +492,11 @@ export default function HostRoom() {
   // 1. Connection Error
   if (!wsConnected && errorMsg) {
     return (
-      <div className="bg-red-950/40 border border-red-500/40 rounded-2xl p-8 max-w-xl mx-auto text-center mt-12 backdrop-blur">
+      <div className="arcade-card bg-red-950/70 border-red-500 p-8 max-w-xl mx-auto text-center mt-12">
         <ShieldAlert className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-white mb-2">Koneksi WebSocket Terputus</h3>
+        <h3 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">Koneksi WebSocket Terputus</h3>
         <p className="text-red-200 text-sm mb-6">{errorMsg}</p>
-        <p className="text-xs text-gray-400">Jalankan <code className="bg-black/50 px-2 py-1 rounded text-purple-300">npm run dev</code> untuk menyalakan frontend Astro dan backend WS bersamaan.</p>
+        <p className="text-xs font-mono text-slate-400">Jalankan <code className="bg-black px-2 py-1 rounded text-amber-400">npm run dev</code> untuk menyalakan frontend Astro dan backend WS bersamaan.</p>
       </div>
     );
   }
@@ -504,79 +504,54 @@ export default function HostRoom() {
   // 2. Select Quiz Phase
   if (phase === 'SELECT') {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="text-center mb-10">
+      <div className="max-w-5xl mx-auto py-8 px-4">
+        <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
-              <Sparkles className="w-3.5 h-3.5" /> Host Mode Setup
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold bg-[#151c2c] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000]">
+              HOST ROOM SETUP
             </span>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-              wsConnected 
-                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' 
-                : 'bg-amber-500/10 text-amber-300 border-amber-500/30 animate-pulse'
+            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-mono font-bold border-2 border-black shadow-[2px_2px_0px_#000] ${
+              wsConnected ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'
             }`}>
-              <Radio className="w-3 h-3" />
-              {wsConnected ? 'Realtime Server Aktif' : 'Menghubungkan Server...'}
+              <Radio className="w-3.5 h-3.5" />
+              {wsConnected ? 'Server Online' : 'Connecting...'}
             </span>
           </div>
-          <h2 className="text-3xl font-extrabold text-white">Pilih Paket Kuis</h2>
-          <p className="text-gray-400 text-sm mt-2">Pilih paket soal yang ingin kamu sajikan untuk para peserta di layar ini.</p>
+          <h2 className="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white">Pilih Paket Kuis</h2>
+          <p className="text-slate-400 text-sm mt-2 font-medium">Pilih salah satu paket soal di bawah untuk membuka room kuis baru.</p>
         </div>
 
-        {/* Highlighted Live Features Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-8">
-          <div className="bg-gradient-to-br from-pink-500/15 to-purple-500/10 border border-pink-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
-            <span className="text-3xl">🎭</span>
-            <div>
-              <h4 className="text-sm font-bold text-white">Live Floating Reactions</h4>
-              <p className="text-xs text-pink-200/80">Kirim emoji ❤️🔥🚀 melayang realtime di layar bersama</p>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-500/15 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
-            <span className="text-3xl">⚡</span>
-            <div>
-              <h4 className="text-sm font-bold text-white">Power-Up Lifelines</h4>
-              <p className="text-xs text-amber-200/80">Bantuan 50:50 potong 2 opsi & 2x Points Boost pembalik skor</p>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-cyan-500/15 to-blue-500/10 border border-cyan-500/30 rounded-2xl p-4 flex items-center gap-3 backdrop-blur">
-            <span className="text-3xl">📱</span>
-            <div>
-              <h4 className="text-sm font-bold text-white">QR Code & Live Board</h4>
-              <p className="text-xs text-cyan-200/80">Scan QR / 1-Klik join instan + klasemen live antar-soal</p>
-            </div>
-          </div>
-        </div>
-
-        {/* 3-Way Game Mode Selector */}
+        {/* Mode Selector Neo-Brutalist */}
         {renderModeSelector(false)}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Grid Paket Soal */}
+        <div className="grid md:grid-cols-2 gap-5">
           {availableQuizzes.map((quiz) => (
             <div 
               key={quiz.id}
-              className="bg-slate-800/60 border border-slate-700 hover:border-purple-500/60 rounded-2xl p-6 transition-all hover:shadow-xl hover:shadow-purple-500/10 flex flex-col justify-between"
+              className="arcade-card p-6 flex flex-col justify-between bg-[#151c2c]"
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-bold text-white">{quiz.title}</h3>
-                  <span className="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full">
-                    {quiz.questionCount} Soal
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+                    {quiz.title}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-300 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+                    {quiz.questionCount} SOAL
                   </span>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed mb-6">
+                <h3 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">{quiz.title}</h3>
+                <p className="text-slate-300 text-sm leading-relaxed mb-6 font-medium">
                   {quiz.description}
                 </p>
               </div>
 
               <button
                 onClick={() => createRoom(quiz.id)}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group"
+                className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl arcade-btn flex items-center justify-center gap-2"
               >
-                <span>Buka Room Kuis</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <span>Buka Room Kuis Ini</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ))}
@@ -595,12 +570,12 @@ export default function HostRoom() {
         {renderPowerupToast()}
         <div className="max-w-5xl mx-auto py-6 px-4 pb-24">
           {/* Top Header Card with PIN & QR Code */}
-          <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl mb-8 relative overflow-hidden">
+          <div className="arcade-card p-6 sm:p-8 bg-[#151c2c] mb-8 relative">
             <div className="absolute top-4 right-4 flex items-center gap-2">
               {renderModeSelector(true)}
               <button 
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-xl border border-slate-600 text-xs shadow-md"
+                className="p-2 bg-[#1e293b] hover:bg-slate-700 text-slate-200 rounded-lg border-2 border-black text-xs shadow-[2px_2px_0px_#000]"
                 title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
               >
                 {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -610,29 +585,29 @@ export default function HostRoom() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               {/* Left Column: PIN & Info */}
               <div className="flex-1 text-center md:text-left">
-                <p className="text-purple-300 text-xs font-semibold tracking-wider uppercase mb-1">
-                  Buka di Browser: <span className="text-white font-mono bg-black/40 px-2 py-0.5 rounded">/play</span> atau scan QR
+                <p className="text-slate-400 text-xs font-mono font-bold uppercase tracking-wider mb-2">
+                  Buka di browser: <span className="text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">/play</span> atau scan QR
                 </p>
 
-                <div className="inline-flex items-center gap-4 my-2">
-                  <span className="text-5xl sm:text-6xl md:text-7xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-300 font-mono drop-shadow-md">
+                <div className="inline-flex items-center gap-3 my-2 bg-[#0b0f19] border-2 border-black p-3 sm:p-4 rounded-xl shadow-[3px_3px_0px_#000]">
+                  <span className="text-5xl sm:text-6xl md:text-7xl font-black tracking-widest text-amber-400 font-mono tabular-nums">
                     {roomCode}
                   </span>
                   <button
                     onClick={copyPin}
-                    className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
+                    className="p-3 bg-[#1e293b] hover:bg-slate-700 text-white rounded-lg border-2 border-black arcade-btn"
                     title="Salin PIN"
                   >
-                    {copied ? <Check className="w-6 h-6 text-green-400" /> : <Copy className="w-6 h-6" />}
+                    {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
                   </button>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs text-gray-300">
-                  <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-                    📖 Kuis: <strong className="text-white">{quizMeta.title}</strong>
+                <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2.5 text-xs text-slate-300 font-mono">
+                  <span className="bg-[#0b0f19] px-3 py-1 rounded border border-black">
+                    Kuis: <strong className="text-white">{quizMeta.title}</strong>
                   </span>
-                  <span className="bg-black/30 px-3 py-1 rounded-full border border-white/10">
-                    ❓ Total: <strong className="text-white">{quizMeta.count} Soal</strong>
+                  <span className="bg-[#0b0f19] px-3 py-1 rounded border border-black">
+                    Total: <strong className="text-white">{quizMeta.count} Soal</strong>
                   </span>
                 </div>
 
@@ -641,23 +616,23 @@ export default function HostRoom() {
                     href={`/play?pin=${roomCode}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/40 shadow-lg shadow-purple-600/30 transition-all hover:scale-105"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-amber-400 hover:bg-amber-300 text-slate-950 arcade-btn"
                   >
-                    <span>🔗 Buka Tab Pemain (Auto-PIN)</span>
+                    <span>Buka Tab Pemain (Auto-PIN)</span>
                   </a>
                 </div>
               </div>
 
               {/* Right Column: Dynamic QR Code */}
-              <div className="bg-white/10 border border-white/20 p-4 rounded-2xl flex flex-col items-center shadow-inner shrink-0 backdrop-blur">
-                <div className="bg-white p-2 rounded-xl shadow-md">
+              <div className="bg-[#0b0f19] border-2 border-black p-4 rounded-xl flex flex-col items-center shadow-[3px_3px_0px_#000] shrink-0">
+                <div className="bg-white p-2 rounded border-2 border-black">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(joinUrl)}`}
                     alt="QR Code Masuk Kuis"
-                    className="w-28 h-28 sm:w-32 sm:h-32 rounded"
+                    className="w-28 h-28 sm:w-32 sm:h-32"
                   />
                 </div>
-                <span className="text-[11px] font-bold text-purple-200 mt-2">📱 Scan QR untuk Join</span>
+                <span className="text-[11px] font-mono font-bold text-amber-400 mt-2">SCAN QR UNTUK JOIN</span>
               </div>
             </div>
           </div>
@@ -667,45 +642,47 @@ export default function HostRoom() {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                  <span className="font-['Space_Grotesk',sans-serif] text-sm font-black text-white flex items-center gap-1.5">
                     {gameMode === 'bomb_tag' ? '💣 Estafet Bom 3D (Lobby Preview)' : gameMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D (Lobby Preview)' : '🌋 Lantai Lava 3D (Lobby Preview)'}
                   </span>
-                  <span className="text-xs text-purple-300 bg-purple-500/20 px-2.5 py-0.5 rounded-full border border-purple-500/30 hidden sm:inline">
-                    Host & Pemain dapat bergerak dengan WASD / Tombol Arah
+                  <span className="text-xs font-mono text-slate-400 bg-[#151c2c] px-2 py-0.5 rounded border border-black hidden sm:inline">
+                    Gunakan WASD / Tombol Arah untuk bergerak
                   </span>
                 </div>
               </div>
-              <RobloxArena3D
-                phase="LOBBY"
-                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
-                bombHolderId={bombHolderId}
-                explodedPlayerId={explodedPlayerId}
-                isHost={true}
-                players={players}
-              />
+              <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
+                <RobloxArena3D
+                  phase="LOBBY"
+                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  bombHolderId={bombHolderId}
+                  explodedPlayerId={explodedPlayerId}
+                  isHost={true}
+                  players={players}
+                />
+              </div>
             </div>
           )}
 
           {/* Players Area */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur mb-8">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+          <div className="arcade-card p-6 sm:p-8 bg-[#151c2c] mb-8">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-black">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-purple-500/20 text-purple-300 rounded-xl">
-                  <Users className="w-6 h-6" />
+                <div className="p-2.5 bg-amber-400 text-slate-950 font-black rounded-lg border-2 border-black">
+                  <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Peserta di Lobby ({players.length})</h3>
-                  <p className="text-xs text-gray-400">Menunggu pemain lain bergabung melalui perangkat mereka...</p>
+                  <h3 className="font-['Space_Grotesk',sans-serif] text-xl font-black text-white">Peserta di Lobby ({players.length})</h3>
+                  <p className="text-xs text-slate-400 font-medium">Menunggu peserta bergabung melalui HP atau tab browser lain...</p>
                 </div>
               </div>
 
               <button
                 onClick={startGame}
                 disabled={players.length === 0}
-                className={`px-8 py-3.5 rounded-xl font-bold text-white shadow-xl flex items-center gap-2 transition-all ${
+                className={`px-8 py-3.5 rounded-xl font-black text-slate-950 shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-all ${
                   players.length > 0 
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 cursor-pointer shadow-emerald-500/20'
-                    : 'bg-slate-700/50 text-gray-500 cursor-not-allowed'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 arcade-btn cursor-pointer'
+                    : 'bg-slate-700 text-slate-400 border-2 border-black cursor-not-allowed'
                 }`}
               >
                 <Play className="w-5 h-5 fill-current" />
@@ -714,22 +691,22 @@ export default function HostRoom() {
             </div>
 
             {players.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl">
-                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                  <Users className="w-8 h-8 text-gray-500" />
+              <div className="text-center py-12 border-2 border-dashed border-black bg-[#0b0f19] rounded-xl">
+                <div className="w-14 h-14 bg-[#151c2c] border-2 border-black rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-7 h-7 text-slate-500" />
                 </div>
-                <p className="text-gray-400 font-medium text-sm">Belum ada peserta yang bergabung.</p>
-                <p className="text-gray-500 text-xs mt-1">Buka tab baru di browser dan akses <code className="text-purple-400 font-mono">/play</code> untuk mencoba join!</p>
+                <p className="text-slate-300 font-bold text-sm">Belum ada peserta yang bergabung.</p>
+                <p className="text-slate-500 text-xs mt-1 font-mono">Buka tab baru dan akses <code className="text-amber-400">/play</code> dengan PIN di atas.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {players.map((p) => (
                   <div 
                     key={p.id}
-                    className="bg-slate-800/80 border border-purple-500/20 rounded-2xl p-4 text-center transform hover:scale-105 transition-all shadow-md animate-bounce-short"
+                    className="bg-[#1e293b] border-2 border-black p-3.5 text-center rounded-xl shadow-[2px_2px_0px_#000]"
                   >
-                    <span className="text-4xl block mb-2">{p.avatar}</span>
-                    <p className="font-bold text-white text-sm truncate">{p.name}</p>
+                    <span className="text-3xl block mb-1">{p.avatar}</span>
+                    <p className="font-bold text-white text-xs truncate">{p.name}</p>
                   </div>
                 ))}
               </div>
@@ -747,11 +724,11 @@ export default function HostRoom() {
       <>
         {renderFloatingReactions()}
         <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-          <p className="text-purple-300 uppercase tracking-widest text-sm font-bold mb-4">Bersiaplah!</p>
-          <div className="w-40 h-40 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-full flex items-center justify-center text-8xl font-black text-white shadow-2xl shadow-purple-500/40 animate-pulse">
+          <p className="text-amber-400 uppercase tracking-widest text-xs font-mono font-bold mb-4">BERSUMBU DAN BERSIAPLAH!</p>
+          <div className="w-36 h-36 bg-amber-400 text-slate-950 rounded-2xl border-4 border-black shadow-[6px_6px_0px_#000] flex items-center justify-center text-7xl font-black font-mono">
             {countdownNum}
           </div>
-          <p className="text-gray-400 text-sm mt-6">Kuis akan dimulai dalam hitungan detik...</p>
+          <p className="text-slate-400 text-sm mt-6 font-medium">Soal pertama akan segera ditampilkan...</p>
         </div>
       </>
     );
@@ -767,72 +744,74 @@ export default function HostRoom() {
         {renderFloatingReactions()}
         {renderPowerupToast()}
         <div className="max-w-5xl mx-auto py-4 px-4 pb-24">
-          {/* Top bar with Question tracker, Timer, Actions, and Answer Count */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
+          {/* Top Scoreboard Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 arcade-card p-3.5 bg-[#151c2c]">
             <div className="flex items-center gap-2 sm:gap-3">
-              <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-xs sm:text-sm border border-purple-500/30">
-                Soal {currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
+              <span className="bg-[#0b0f19] text-amber-400 font-mono font-bold px-3 py-1.5 rounded-lg text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000]">
+                SOAL {currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
               </span>
               {renderModeSelector(true)}
             </div>
 
-            <div className="flex items-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-5">
               {!isReview && gameMode !== 'classic' && (
                 <button
                   type="button"
                   onClick={skipTimer}
-                  className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-extrabold text-xs rounded-xl shadow-lg border border-red-400/40 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                  title={gameMode === 'bomb_tag' ? 'Ledakkan bom sekarang!' : 'Langsung akhiri waktu'}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white font-black text-xs rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 arcade-btn"
+                  title="Langsung akhiri waktu soal"
                 >
                   <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>{gameMode === 'bomb_tag' ? '💥 Ledakkan Bom Sekarang' : gameMode === 'glass_bridge' ? 'Pecahkan Kaca' : 'Runtuhkan Lantai'}</span>
+                  <span>{gameMode === 'bomb_tag' ? 'Ledakkan Bom' : 'Akhiri Soal'}</span>
                 </button>
               )}
 
-              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-300">
-                <Users className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono text-slate-300 bg-[#0b0f19] px-2.5 py-1 rounded-lg border border-black">
+                <Users className="w-4 h-4 text-slate-400" />
                 <span>
-                  <strong className="text-white font-mono">{answeredCount}</strong>/{players.length}
+                  <strong className="text-white font-mono tabular-nums">{answeredCount}</strong>/{players.length}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <Clock className={`w-4 h-4 ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
-                <span className={`text-xl sm:text-2xl font-mono font-black ${timeLeft <= 5 ? 'text-red-400' : 'text-white'}`}>
+              <div className="flex items-center gap-1.5 bg-[#0b0f19] px-3 py-1 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000]">
+                <Clock className={`w-4 h-4 ${timeLeft <= 5 ? 'text-red-500' : 'text-amber-400'}`} />
+                <span className={`text-xl sm:text-2xl font-mono font-black tabular-nums ${timeLeft <= 5 ? 'text-red-500' : 'text-amber-400'}`}>
                   {timeLeft}s
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Timer progress bar */}
-          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-6">
+          {/* Progress Bar */}
+          <div className="w-full bg-[#0b0f19] border-2 border-black h-3 rounded-full overflow-hidden mb-6 shadow-[2px_2px_0px_#000]">
             <div 
               className={`h-full transition-all duration-1000 ${
-                timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-purple-500 to-indigo-400'
+                timeLeft <= 5 ? 'bg-red-500' : 'bg-amber-400'
               }`}
               style={{ width: `${percentTime}%` }}
             />
           </div>
 
-          {/* 3D Roblox Arena or Classic View */}
+          {/* 3D Roblox Arena */}
           {gameMode !== 'classic' ? (
             <div className="mb-6 space-y-4">
-              <RobloxArena3D
-                phase={phase}
-                arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
-                bombHolderId={bombHolderId}
-                explodedPlayerId={explodedPlayerId}
-                isHost={true}
-                players={players}
-                correctIndex={isReview ? currentQuestion.correctIndex : null}
-                options={currentQuestion.options}
-                questionText={currentQuestion.text}
-                timeLeft={timeLeft}
-              />
+              <div className="border-2 border-black shadow-[4px_4px_0px_#000] rounded-2xl overflow-hidden">
+                <RobloxArena3D
+                  phase={phase}
+                  arenaMode={gameMode === 'classic' ? 'bomb_tag' : gameMode}
+                  bombHolderId={bombHolderId}
+                  explodedPlayerId={explodedPlayerId}
+                  isHost={true}
+                  players={players}
+                  correctIndex={isReview ? currentQuestion.correctIndex : null}
+                  options={currentQuestion.options}
+                  questionText={currentQuestion.text}
+                  timeLeft={timeLeft}
+                />
+              </div>
 
-              {/* Compact Options Reference Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+              {/* 4 Opsi Jawaban Arcade Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {currentQuestion.options.map((opt, idx) => {
                   const theme = OPTION_THEMES[idx];
                   const isCorrect = isReview && idx === currentQuestion.correctIndex;
@@ -841,27 +820,27 @@ export default function HostRoom() {
                   return (
                     <div
                       key={idx}
-                      className={`p-3 rounded-2xl flex flex-col justify-between text-white font-bold transition-all border ${theme.bg} ${
+                      className={`p-3.5 rounded-xl flex flex-col justify-between font-bold transition-all border-2 border-black ${theme.bg} ${theme.text} ${
                         isReview 
                           ? isCorrect
-                            ? 'ring-4 ring-white shadow-2xl scale-[1.03] border-white'
-                            : 'opacity-40 grayscale-[40%] border-transparent'
-                          : 'shadow-md border-transparent'
+                            ? 'ring-4 ring-white shadow-[6px_6px_0px_#000] scale-[1.02]'
+                            : 'opacity-30 grayscale-[70%]'
+                          : 'shadow-[3px_3px_0px_#000]'
                       }`}
                     >
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-mono bg-black/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                      <div className="flex items-center justify-between text-xs mb-1 font-mono">
+                        <span className="bg-black/30 px-2 py-0.5 rounded flex items-center gap-1 text-white">
                           <span>{theme.shape}</span>
                           <span>{theme.label}</span>
                         </span>
                         {isReview && (
-                          <span className="bg-black/40 px-2 py-0.5 rounded-lg font-mono text-[11px] flex items-center gap-1">
+                          <span className="bg-black/40 px-2 py-0.5 rounded text-[11px] text-white flex items-center gap-1">
                             <Users className="w-3 h-3" />
                             <span>{count}</span>
                           </span>
                         )}
                       </div>
-                      <p className="text-xs sm:text-sm font-semibold leading-snug line-clamp-2">
+                      <p className="text-xs sm:text-sm font-semibold leading-snug line-clamp-2 mt-1">
                         {opt}
                       </p>
                     </div>
@@ -870,26 +849,26 @@ export default function HostRoom() {
               </div>
 
               {isReview && currentQuestion.explanation && (
-                <div className="p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200">
-                  💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
+                <div className="p-3.5 bg-[#151c2c] border-2 border-black rounded-xl text-xs text-slate-200 font-medium">
+                  <strong className="text-amber-400">Penjelasan:</strong> {currentQuestion.explanation}
                 </div>
               )}
             </div>
           ) : (
             <>
-              {/* Big Question Card */}
-              <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-3xl p-8 mb-6 shadow-2xl text-center">
-                <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-relaxed">
+              {/* Big Question Card Classic */}
+              <div className="arcade-card p-8 mb-6 bg-[#151c2c] text-center">
+                <h2 className="font-['Space_Grotesk',sans-serif] text-2xl md:text-3xl font-black text-white leading-relaxed">
                   {currentQuestion.text}
                 </h2>
                 {isReview && currentQuestion.explanation && (
-                  <div className="mt-4 p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200 text-left max-w-2xl mx-auto">
-                    💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
+                  <div className="mt-4 p-3 bg-[#0b0f19] border border-black rounded-lg text-xs text-slate-300 text-left max-w-2xl mx-auto font-medium">
+                    <strong className="text-amber-400">Penjelasan:</strong> {currentQuestion.explanation}
                   </div>
                 )}
               </div>
 
-              {/* 4 Answer Options */}
+              {/* 4 Answer Options Classic */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {currentQuestion.options.map((opt, idx) => {
                   const theme = OPTION_THEMES[idx];
@@ -899,23 +878,23 @@ export default function HostRoom() {
                   return (
                     <div
                       key={idx}
-                      className={`p-6 rounded-2xl flex items-center justify-between text-white font-bold transition-all ${theme.bg} ${
+                      className={`p-5 rounded-xl flex items-center justify-between font-bold border-2 border-black ${theme.bg} ${theme.text} ${
                         isReview 
                           ? isCorrect
-                            ? 'ring-4 ring-white shadow-2xl scale-[1.02] opacity-100'
-                            : 'opacity-40 grayscale-[40%]'
-                          : 'shadow-lg'
+                            ? 'ring-4 ring-white shadow-[6px_6px_0px_#000] scale-[1.02] opacity-100'
+                            : 'opacity-30 grayscale-[70%]'
+                          : 'shadow-[4px_4px_0px_#000]'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                        <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xl font-mono">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 rounded bg-black/20 text-white flex items-center justify-center text-lg font-mono">
                           {theme.shape}
                         </span>
-                        <span className="text-lg md:text-xl font-medium">{opt}</span>
+                        <span className="text-base sm:text-lg font-bold">{opt}</span>
                       </div>
 
                       {isReview && (
-                        <div className="bg-black/30 px-3 py-1 rounded-xl text-sm font-mono flex items-center gap-1.5">
+                        <div className="bg-black/30 text-white px-3 py-1 rounded text-sm font-mono flex items-center gap-1.5">
                           <Users className="w-4 h-4" />
                           <span>{count}</span>
                         </div>
@@ -929,40 +908,36 @@ export default function HostRoom() {
 
           {/* Inter-Question Live Leaderboard */}
           {isReview && players.length > 0 && (
-            <div className="bg-slate-900/80 border border-purple-500/30 rounded-2xl p-5 mb-6 backdrop-blur shadow-xl">
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
-                <Trophy className="w-5 h-5 text-yellow-400" />
-                <h3 className="font-extrabold text-white text-base">🏆 Klasemen Sementara (Live Leaderboard)</h3>
+            <div className="arcade-card p-5 mb-6 bg-[#151c2c]">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-black">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                <h3 className="font-['Space_Grotesk',sans-serif] font-black text-white text-base">Klasemen Sementara (Live Leaderboard)</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {players.slice(0, 6).map((p, idx) => (
                   <div
                     key={p.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border ${
+                    className={`flex items-center justify-between p-3 rounded-lg border-2 border-black ${
                       idx === 0 
-                        ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-200' 
-                        : idx === 1 
-                        ? 'bg-slate-800/90 border-slate-600 text-slate-200' 
-                        : idx === 2 
-                        ? 'bg-amber-800/20 border-amber-600/40 text-amber-200' 
-                        : 'bg-slate-800/50 border-slate-700/60 text-gray-300'
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-[2px_2px_0px_#000]' 
+                        : 'bg-[#1e293b] text-slate-200'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
                       <span className="font-mono font-black text-sm w-5 text-center">
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                        #{idx + 1}
                       </span>
                       <span className="text-xl">{p.avatar}</span>
                       <div className="truncate">
-                        <span className="font-bold text-white text-sm truncate block">{p.name}</span>
+                        <span className="font-bold text-sm truncate block">{p.name}</span>
                         {p.streak > 1 && (
-                          <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5">
-                            🔥 {p.streak}x streak
+                          <span className="text-[10px] font-mono font-bold block">
+                            Streak: {p.streak}x
                           </span>
                         )}
                       </div>
                     </div>
-                    <span className="font-mono font-black text-sm text-purple-300 ml-2 shrink-0">
+                    <span className="font-mono font-black text-sm ml-2 shrink-0">
                       {p.score} pts
                     </span>
                   </div>
@@ -971,12 +946,12 @@ export default function HostRoom() {
             </div>
           )}
 
-          {/* Review Action Footer */}
+          {/* Action Footer */}
           {isReview && (
             <div className="flex justify-end mt-4">
               <button
                 onClick={nextQuestion}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg transition-all flex items-center gap-2 text-base cursor-pointer"
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-8 rounded-xl arcade-btn flex items-center gap-2 text-base"
               >
                 <span>{currentQuestion.questionIndex + 1 >= currentQuestion.totalQuestions ? 'Lihat Papan Skor Akhir' : 'Soal Berikutnya'}</span>
                 <ArrowRight className="w-5 h-5" />
@@ -999,21 +974,21 @@ export default function HostRoom() {
         {renderFloatingReactions()}
         {renderPowerupToast()}
         <div className="max-w-4xl mx-auto py-8 px-4 pb-24 text-center">
-          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 mb-3">
-            <Trophy className="w-4 h-4" /> Game Over
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold bg-amber-400 text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000] mb-3">
+            GAME OVER
           </span>
-          <h2 className="text-4xl font-extrabold text-white mb-2">Papan Skor Juara!</h2>
-          <p className="text-gray-400 text-sm mb-12">Selamat kepada para pemenang kuis kali ini!</p>
+          <h2 className="font-['Space_Grotesk',sans-serif] text-4xl font-black text-white mb-2">Papan Skor Juara</h2>
+          <p className="text-slate-400 text-sm mb-12 font-medium">Selamat kepada seluruh peserta dan juara kuis!</p>
 
-          {/* Podium Graphic */}
+          {/* Podium Graphic Neo-Brutalist */}
           <div className="flex items-end justify-center gap-4 mb-12 max-w-lg mx-auto">
             {/* 2nd Place */}
             {top3[1] && (
               <div className="flex-1 flex flex-col items-center">
                 <span className="text-4xl mb-2">{top3[1].avatar}</span>
                 <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[1].name}</p>
-                <p className="text-xs text-gray-400 mb-2 font-mono">{top3[1].score} pts</p>
-                <div className="w-full h-32 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-2xl flex items-center justify-center text-3xl font-black text-slate-300 border-t-4 border-slate-400 shadow-xl">
+                <p className="text-xs text-slate-400 mb-2 font-mono">{top3[1].score} pts</p>
+                <div className="w-full h-32 bg-[#1e293b] border-2 border-black rounded-t-xl flex items-center justify-center text-3xl font-black text-slate-300 shadow-[4px_4px_0px_#000]">
                   2
                 </div>
               </div>
@@ -1022,10 +997,10 @@ export default function HostRoom() {
             {/* 1st Place */}
             {top3[0] && (
               <div className="flex-1 flex flex-col items-center">
-                <span className="text-5xl mb-2 animate-bounce">👑 {top3[0].avatar}</span>
-                <p className="font-extrabold text-yellow-300 text-base truncate max-w-[120px]">{top3[0].name}</p>
-                <p className="text-xs text-yellow-400 font-bold mb-2 font-mono">{top3[0].score} pts</p>
-                <div className="w-full h-44 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl flex items-center justify-center text-5xl font-black text-white border-t-4 border-yellow-300 shadow-2xl">
+                <span className="text-5xl mb-2">👑 {top3[0].avatar}</span>
+                <p className="font-black text-amber-400 text-base truncate max-w-[120px]">{top3[0].name}</p>
+                <p className="text-xs text-amber-300 font-bold mb-2 font-mono">{top3[0].score} pts</p>
+                <div className="w-full h-44 bg-amber-400 border-2 border-black rounded-t-xl flex items-center justify-center text-5xl font-black text-slate-950 shadow-[6px_6px_0px_#000]">
                   1
                 </div>
               </div>
@@ -1036,8 +1011,8 @@ export default function HostRoom() {
               <div className="flex-1 flex flex-col items-center">
                 <span className="text-4xl mb-2">{top3[2].avatar}</span>
                 <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[2].name}</p>
-                <p className="text-xs text-gray-400 mb-2 font-mono">{top3[2].score} pts</p>
-                <div className="w-full h-24 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-2xl flex items-center justify-center text-2xl font-black text-amber-300 border-t-4 border-amber-600 shadow-xl">
+                <p className="text-xs text-slate-400 mb-2 font-mono">{top3[2].score} pts</p>
+                <div className="w-full h-24 bg-[#151c2c] border-2 border-black rounded-t-xl flex items-center justify-center text-2xl font-black text-amber-400 shadow-[4px_4px_0px_#000]">
                   3
                 </div>
               </div>
@@ -1046,17 +1021,17 @@ export default function HostRoom() {
 
           {/* Rest of Leaderboard */}
           {rest.length > 0 && (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 max-w-md mx-auto mb-8 text-left">
-              <h4 className="text-xs uppercase font-bold text-gray-400 tracking-wider mb-3">Peringkat Lainnya</h4>
+            <div className="arcade-card p-4 max-w-md mx-auto mb-8 text-left bg-[#151c2c]">
+              <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Peringkat Lainnya:</h4>
               <div className="space-y-2">
                 {rest.map((p, idx) => (
-                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-slate-800/60 rounded-xl text-sm">
+                  <div key={p.id} className="flex items-center justify-between p-2.5 bg-[#0b0f19] border border-black rounded-lg text-sm">
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-gray-400 font-bold w-6">{idx + 4}.</span>
+                      <span className="font-mono text-slate-400 font-bold w-6">#{idx + 4}</span>
                       <span className="text-lg">{p.avatar}</span>
-                      <span className="font-medium text-white">{p.name}</span>
+                      <span className="font-bold text-white">{p.name}</span>
                     </div>
-                    <span className="font-mono font-bold text-purple-300">{p.score} pts</span>
+                    <span className="font-mono font-bold text-amber-400">{p.score} pts</span>
                   </div>
                 ))}
               </div>
@@ -1065,7 +1040,7 @@ export default function HostRoom() {
 
           <button
             onClick={restartGame}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 px-8 rounded-xl shadow-xl transition-all inline-flex items-center gap-2 cursor-pointer"
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 px-8 rounded-xl arcade-btn inline-flex items-center gap-2"
           >
             <RotateCcw className="w-5 h-5" />
             <span>Main Lagi di Room Ini</span>
