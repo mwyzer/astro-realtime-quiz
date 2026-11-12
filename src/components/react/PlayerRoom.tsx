@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
+import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
 import { 
   Gamepad2, CheckCircle2, XCircle, Clock, 
   Flame, Award, AlertCircle, Sparkles, Send, Radio 
@@ -41,6 +42,10 @@ export default function PlayerRoom() {
 
   // Floating reactions
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+
+  // Roblox 3D Mode & Players
+  const [robloxMode, setRobloxMode] = useState(true);
+  const [arenaPlayers, setArenaPlayers] = useState<Player3DData[]>([]);
 
   // Power-Up Lifelines
   const [fiftyFiftyLeft, setFiftyFiftyLeft] = useState(true);
@@ -128,8 +133,69 @@ export default function PlayerRoom() {
         setRoomCode(msg.code);
         setPhase('LOBBY');
         setErrorMsg(null);
+        setArenaPlayers([{
+          id: msg.playerId,
+          name: name.trim() || 'Pemain',
+          avatar,
+          x: 0,
+          z: 0,
+          jumping: false,
+          currentAnswer: null
+        }]);
         sound.playPop();
         break;
+
+      case 'PLAYER_LIST_UPDATE': {
+        if (msg.players && Array.isArray(msg.players)) {
+          setArenaPlayers(prev => {
+            const oldMap = new Map(prev.map(p => [p.id, p]));
+            return msg.players.map((p: any) => {
+              const existing = oldMap.get(p.id);
+              return {
+                id: p.id,
+                name: p.name,
+                avatar: p.avatar,
+                x: existing?.x ?? p.x ?? 0,
+                z: existing?.z ?? p.z ?? 0,
+                jumping: existing?.jumping ?? p.jumping ?? false,
+                currentAnswer: existing?.currentAnswer ?? p.currentAnswer ?? null
+              };
+            });
+          });
+        }
+        break;
+      }
+
+      case 'PLAYERS_POSITIONS': {
+        const posMap = new Map((msg.positions || []).map((p: any) => [p.id, p]));
+        setArenaPlayers(prev => {
+          if (prev.length === 0 && msg.positions) {
+            return msg.positions.map((p: any) => ({
+              id: p.id,
+              name: p.id === playerId ? (name || 'Pemain') : 'Peserta',
+              avatar: p.id === playerId ? avatar : '👾',
+              x: p.x,
+              z: p.z,
+              jumping: p.jumping,
+              currentAnswer: p.currentAnswer
+            }));
+          }
+          return prev.map(pl => {
+            const pos = posMap.get(pl.id);
+            if (pos) {
+              return {
+                ...pl,
+                x: pos.x,
+                z: pos.z,
+                jumping: pos.jumping,
+                currentAnswer: pos.currentAnswer
+              };
+            }
+            return pl;
+          });
+        });
+        break;
+      }
 
       case 'COUNTDOWN_TICK':
         setPhase('COUNTDOWN');
@@ -267,7 +333,7 @@ export default function PlayerRoom() {
   };
 
   const submitAnswer = (optionIndex: number) => {
-    if (phase !== 'QUESTION' || selectedOption !== null) return;
+    if (phase !== 'QUESTION' && phase !== 'SUBMITTED') return;
     setSelectedOption(optionIndex);
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
@@ -276,6 +342,20 @@ export default function PlayerRoom() {
         code: roomCode,
         playerId,
         answerIndex: optionIndex
+      }));
+    }
+  };
+
+  const handlePlayerMove = (x: number, z: number, jumping: boolean, zoneIndex: number | null) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode && playerId) {
+      wsRef.current.send(JSON.stringify({
+        type: 'PLAYER_MOVE',
+        code: roomCode,
+        playerId,
+        x,
+        z,
+        jumping,
+        answerIndex: zoneIndex
       }));
     }
   };
@@ -478,14 +558,49 @@ export default function PlayerRoom() {
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
-          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-            <div className="text-6xl mb-4 animate-bounce">{avatar}</div>
-            <h2 className="text-2xl font-black text-white">{name}</h2>
-            <p className="text-purple-300 text-xs font-mono mt-1 mb-6">Room PIN: {roomCode}</p>
+        <div className="max-w-2xl mx-auto py-8 px-4 pb-24 text-center">
+          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl">
+            {/* Top Player Status & Mode Switch */}
+            <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3 text-left">
+                <span className="text-4xl">{avatar}</span>
+                <div>
+                  <h2 className="text-xl font-black text-white">{name}</h2>
+                  <p className="text-purple-300 text-xs font-mono">Room PIN: {roomCode}</p>
+                </div>
+              </div>
 
-            <div className="py-6 px-4 bg-slate-800/80 rounded-2xl border border-slate-700 mb-6">
-              <div className="inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-3" />
+              <button 
+                type="button"
+                onClick={() => setRobloxMode(!robloxMode)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  robloxMode 
+                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md shadow-purple-600/20' 
+                    : 'bg-slate-800 text-gray-400 border-slate-700 hover:text-white'
+                }`}
+                title="Ganti Mode Tampilan"
+              >
+                <span>{robloxMode ? '🎮 Mode 3D Arena' : '📋 Mode Klasik'}</span>
+              </button>
+            </div>
+
+            {/* 3D Roblox Interactive Arena in Lobby */}
+            {robloxMode && (
+              <div className="mb-6">
+                <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
+                  <span>🎮 Arena Latihan (Gunakan WASD / Tombol Bawah untuk Bergerak)</span>
+                </div>
+                <RobloxArena3D
+                  phase="LOBBY"
+                  localPlayerId={playerId}
+                  players={arenaPlayers}
+                  onMove={handlePlayerMove}
+                />
+              </div>
+            )}
+
+            <div className="py-5 px-4 bg-slate-800/80 rounded-2xl border border-slate-700">
+              <div className="inline-block w-7 h-7 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mb-2" />
               <p className="text-white font-bold text-sm">Kamu sudah bergabung!</p>
               <p className="text-gray-400 text-xs mt-1">Perhatikan layar Host. Kuis akan segera dimulai...</p>
             </div>
@@ -512,51 +627,63 @@ export default function PlayerRoom() {
     );
   }
 
-  // 4. Question Phase (Answering Screen)
-  if (phase === 'QUESTION' && questionData) {
-    return (
-      <>
-        {renderFloatingReactions()}
-        <div className="max-w-lg mx-auto py-4 px-4 pb-24 flex flex-col min-h-[85vh] justify-between">
-          {/* Top bar info */}
-          <div>
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-300">
-              <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-                Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
-              </span>
-              <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
-                timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
-              }`}>
-                <Clock className="w-4 h-4" /> {timeLeft}s
-              </span>
-            </div>
+  // 4. Question & Submitted Phase
+  if ((phase === 'QUESTION' || phase === 'SUBMITTED') && questionData) {
+    // If in Roblox 3D Mode, players stay in the arena during both QUESTION and SUBMITTED
+    if (robloxMode) {
+      return (
+        <>
+          {renderFloatingReactions()}
+          <div className="max-w-3xl mx-auto py-3 px-3 sm:px-4 pb-24">
+            {/* Top Bar Info & Mode Toggle */}
+            <div className="flex items-center justify-between mb-3 text-xs text-gray-300 bg-slate-900/80 p-3 rounded-2xl border border-slate-800 backdrop-blur">
+              <div className="flex items-center gap-2">
+                <span className="font-bold bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
+                  Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRobloxMode(false)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-800 text-gray-400 hover:text-white border border-slate-700 font-bold"
+                >
+                  📋 Mode Klasik
+                </button>
+              </div>
 
-            <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl mb-4 text-center">
-              <p className="text-lg font-bold text-white leading-snug">
-                {questionData.text}
-              </p>
+              <div className="flex items-center gap-3">
+                {selectedOption !== null && (
+                  <span className="hidden sm:inline-block text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-lg">
+                    ✓ Jawaban Terpilih: {OPTION_THEMES[selectedOption].shape} {OPTION_THEMES[selectedOption].label}
+                  </span>
+                )}
+                <span className={`font-mono font-bold text-sm sm:text-base flex items-center gap-1 ${
+                  timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
+                }`}>
+                  <Clock className="w-4 h-4" /> {timeLeft}s
+                </span>
+              </div>
             </div>
 
             {/* Power-Up Lifelines Bar */}
-            <div className="bg-slate-900/80 border border-purple-500/30 p-3 rounded-2xl mb-4 backdrop-blur shadow-lg">
+            <div className="bg-slate-900/80 border border-purple-500/30 p-2.5 rounded-2xl mb-3 backdrop-blur shadow-lg">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-yellow-400" /> Power-Up Lifelines
                 </span>
                 {activeDouble && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                     🔥 2x Poin Aktif!
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={useFiftyFifty}
-                  disabled={!fiftyFiftyLeft || hiddenOptions.length > 0 || selectedOption !== null}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                    fiftyFiftyLeft && hiddenOptions.length === 0 && selectedOption === null
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
+                  disabled={!fiftyFiftyLeft || hiddenOptions.length > 0}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    fiftyFiftyLeft && hiddenOptions.length === 0
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
                       : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
                   }`}
                 >
@@ -567,10 +694,10 @@ export default function PlayerRoom() {
                 <button
                   type="button"
                   onClick={useDoublePoints}
-                  disabled={!doublePointsLeft || activeDouble || selectedOption !== null}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                    doublePointsLeft && !activeDouble && selectedOption === null
-                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
+                  disabled={!doublePointsLeft || activeDouble}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    doublePointsLeft && !activeDouble
+                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
                       : activeDouble
                       ? 'bg-amber-500 text-black border-amber-300 font-extrabold animate-pulse'
                       : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
@@ -581,71 +708,222 @@ export default function PlayerRoom() {
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* 4 Big Touch Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
-            {questionData.options.map((opt, idx) => {
-              const theme = OPTION_THEMES[idx];
-              const isHidden = hiddenOptions.includes(idx);
-
-              return (
-                <button
-                  key={idx}
-                  onClick={() => submitAnswer(idx)}
-                  disabled={isHidden || selectedOption !== null}
-                  className={`w-full py-6 px-4 rounded-2xl font-bold text-white shadow-xl flex items-center gap-3.5 transition-all transform ${
-                    isHidden
-                      ? 'opacity-20 pointer-events-none line-through grayscale cursor-not-allowed scale-95 bg-slate-800 border border-slate-700'
-                      : `active:scale-95 cursor-pointer ${theme.bg} ${theme.active}`
-                  }`}
-                >
-                  <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl font-mono shrink-0">
-                    {theme.shape}
-                  </span>
-                  <span className="text-left text-base sm:text-lg leading-tight font-semibold flex-1">
-                    {opt}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="text-center text-xs text-gray-500 mt-3 mb-2">
-            Pilih salah satu jawaban secepat mungkin untuk poin lebih tinggi!
-          </p>
-        </div>
-        {renderReactionDock()}
-      </>
-    );
-  }
-
-  // 5. Submitted State (Waiting for question time to expire)
-  if (phase === 'SUBMITTED') {
-    const chosenTheme = selectedOption !== null ? OPTION_THEMES[selectedOption] : null;
-
-    return (
-      <>
-        {renderFloatingReactions()}
-        <div className="max-w-md mx-auto py-16 px-4 pb-24 text-center">
-          <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
-            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Send className="w-8 h-8" />
+            {/* 3D Roblox Arena */}
+            <div className="mb-3">
+              <RobloxArena3D
+                phase="QUESTION"
+                localPlayerId={playerId}
+                players={arenaPlayers}
+                options={questionData.options}
+                questionText={questionData.text}
+                timeLeft={timeLeft}
+                onMove={handlePlayerMove}
+                onSelectZone={submitAnswer}
+                selectedZone={selectedOption}
+              />
             </div>
-            <h2 className="text-2xl font-extrabold text-white mb-2">Jawaban Terkirim!</h2>
-            <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
 
-            {chosenTheme && (
-              <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg`}>
-                <span>{chosenTheme.shape}</span>
-                <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
-              </div>
-            )}
+            {/* 4 Interactive Option Buttons (Click or Walk) */}
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {questionData.options.map((opt, idx) => {
+                const theme = OPTION_THEMES[idx];
+                const isHidden = hiddenOptions.includes(idx);
+                const isSelected = selectedOption === idx;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => submitAnswer(idx)}
+                    disabled={isHidden}
+                    className={`p-3 rounded-xl font-bold text-white shadow transition-all flex items-center justify-between text-left border ${
+                      isHidden
+                        ? 'opacity-20 pointer-events-none line-through grayscale bg-slate-800 border-slate-700'
+                        : `${theme.bg} ${isSelected ? 'ring-4 ring-white border-white scale-[1.02] shadow-xl' : 'opacity-90 border-transparent active:scale-95'}`
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="w-7 h-7 rounded-lg bg-black/20 flex items-center justify-center text-sm font-mono shrink-0">
+                        {theme.shape}
+                      </span>
+                      <span className="text-xs sm:text-sm font-semibold truncate leading-tight">
+                        {opt}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <span className="text-[10px] font-black bg-white text-black px-1.5 py-0.5 rounded ml-1 shrink-0">
+                        ✓ DIPILIH
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="text-center text-[11px] text-gray-400">
+              💡 Gerakkan karakter ke warna pilihan atau tekan tombol warna di atas. Kamu masih bisa berpindah sebelum waktu habis!
+            </p>
           </div>
-        </div>
-        {renderReactionDock()}
-      </>
-    );
+          {renderReactionDock()}
+        </>
+      );
+    }
+
+    // Classic 2D Question Phase
+    if (phase === 'QUESTION') {
+      return (
+        <>
+          {renderFloatingReactions()}
+          <div className="max-w-lg mx-auto py-4 px-4 pb-24 flex flex-col min-h-[85vh] justify-between">
+            {/* Top bar info */}
+            <div>
+              <div className="flex items-center justify-between mb-3 text-xs text-gray-300">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                    Soal {questionData.questionIndex + 1}/{questionData.totalQuestions}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRobloxMode(true)}
+                    className="px-2.5 py-1 rounded-xl bg-purple-600/30 text-purple-200 border border-purple-500/40 font-bold"
+                  >
+                    🎮 3D Arena
+                  </button>
+                </div>
+                <span className={`font-mono font-bold text-sm flex items-center gap-1 ${
+                  timeLeft <= 5 ? 'text-red-400 font-black animate-pulse' : 'text-yellow-400'
+                }`}>
+                  <Clock className="w-4 h-4" /> {timeLeft}s
+                </span>
+              </div>
+
+              <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl mb-4 text-center">
+                <p className="text-lg font-bold text-white leading-snug">
+                  {questionData.text}
+                </p>
+              </div>
+
+              {/* Power-Up Lifelines Bar */}
+              <div className="bg-slate-900/80 border border-purple-500/30 p-3 rounded-2xl mb-4 backdrop-blur shadow-lg">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-xs font-extrabold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-400" /> Power-Up Lifelines
+                  </span>
+                  {activeDouble && (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                      🔥 2x Poin Aktif!
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={useFiftyFifty}
+                    disabled={!fiftyFiftyLeft || hiddenOptions.length > 0 || selectedOption !== null}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      fiftyFiftyLeft && hiddenOptions.length === 0 && selectedOption === null
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-blue-400/30 shadow cursor-pointer active:scale-95'
+                        : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <span>✂️ 50:50</span>
+                    <span className="text-[10px] opacity-80">{fiftyFiftyLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={useDoublePoints}
+                    disabled={!doublePointsLeft || activeDouble || selectedOption !== null}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      doublePointsLeft && !activeDouble && selectedOption === null
+                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white border-amber-400/30 shadow cursor-pointer active:scale-95'
+                        : activeDouble
+                        ? 'bg-amber-500 text-black border-amber-300 font-extrabold animate-pulse'
+                        : 'bg-slate-800/80 text-gray-500 border-slate-700 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <span>🚀 2x Poin</span>
+                    <span className="text-[10px] opacity-80">{activeDouble ? 'AKTIF' : doublePointsLeft ? '(Tersedia)' : '(Terpakai)'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 4 Big Touch Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
+              {questionData.options.map((opt, idx) => {
+                const theme = OPTION_THEMES[idx];
+                const isHidden = hiddenOptions.includes(idx);
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => submitAnswer(idx)}
+                    disabled={isHidden || selectedOption !== null}
+                    className={`w-full py-6 px-4 rounded-2xl font-bold text-white shadow-xl flex items-center gap-3.5 transition-all transform ${
+                      isHidden
+                        ? 'opacity-20 pointer-events-none line-through grayscale cursor-not-allowed scale-95 bg-slate-800 border border-slate-700'
+                        : `active:scale-95 cursor-pointer ${theme.bg} ${theme.active}`
+                    }`}
+                  >
+                    <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-2xl font-mono shrink-0">
+                      {theme.shape}
+                    </span>
+                    <span className="text-left text-base sm:text-lg leading-tight font-semibold flex-1">
+                      {opt}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="text-center text-xs text-gray-500 mt-3 mb-2">
+              Pilih salah satu jawaban secepat mungkin untuk poin lebih tinggi!
+            </p>
+          </div>
+          {renderReactionDock()}
+        </>
+      );
+    }
+
+    // Classic 2D Submitted Phase
+    if (phase === 'SUBMITTED') {
+      const chosenTheme = selectedOption !== null ? OPTION_THEMES[selectedOption] : null;
+
+      return (
+        <>
+          {renderFloatingReactions()}
+          <div className="max-w-md mx-auto py-16 px-4 pb-24 text-center">
+            <div className="bg-slate-900/80 border border-purple-500/30 rounded-3xl p-8 backdrop-blur shadow-2xl">
+              <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Send className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-white mb-2">Jawaban Terkirim!</h2>
+              <p className="text-gray-400 text-xs mb-6">Menunggu pemain lain dan waktu soal selesai...</p>
+
+              {chosenTheme && (
+                <div className={`p-4 rounded-xl text-white font-bold ${chosenTheme.bg} inline-flex items-center gap-2 shadow-lg`}>
+                  <span>{chosenTheme.shape}</span>
+                  <span>Kamu memilih: {questionData?.options[selectedOption!]}</span>
+                </div>
+              )}
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setRobloxMode(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600/30 text-purple-200 border border-purple-500/40 text-xs font-bold"
+                >
+                  🎮 Buka Mode 3D Arena
+                </button>
+              </div>
+            </div>
+          </div>
+          {renderReactionDock()}
+        </>
+      );
+    }
   }
 
   // 6. Result Phase (Instant feedback after question ends)
@@ -653,16 +931,33 @@ export default function PlayerRoom() {
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
-          <div className={`rounded-3xl p-8 backdrop-blur shadow-2xl border ${
+        <div className="max-w-2xl mx-auto py-6 px-4 pb-24 text-center">
+          {/* Roblox 3D Collapse Animation in Result Phase */}
+          {robloxMode && (
+            <div className="mb-6">
+              <div className="text-xs text-purple-300 mb-2 flex items-center justify-center gap-1.5 font-medium">
+                <span>🔥 Ubin salah runtuh ke lava! Petak benar bertahan!</span>
+              </div>
+              <RobloxArena3D
+                phase="REVIEW"
+                localPlayerId={playerId}
+                players={arenaPlayers}
+                correctIndex={resultData.correctIndex}
+                options={questionData?.options}
+                questionText={questionData?.text}
+              />
+            </div>
+          )}
+
+          <div className={`rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl border ${
             resultData.isCorrect 
               ? 'bg-emerald-950/60 border-emerald-500/50' 
               : 'bg-red-950/60 border-red-500/50'
           }`}>
             {resultData.isCorrect ? (
               <div>
-                <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-4 animate-bounce" />
-                <h2 className="text-3xl font-black text-white">BENAR! 🎉</h2>
+                <CheckCircle2 className="w-16 h-16 sm:w-20 sm:h-20 text-emerald-400 mx-auto mb-3 animate-bounce" />
+                <h2 className="text-2xl sm:text-3xl font-black text-white">BENAR! 🎉</h2>
                 <p className="text-emerald-300 font-mono text-2xl font-bold mt-2">
                   +{resultData.pointsEarned} pts
                 </p>
@@ -675,15 +970,15 @@ export default function PlayerRoom() {
               </div>
             ) : (
               <div>
-                <XCircle className="w-20 h-20 text-red-400 mx-auto mb-4" />
-                <h2 className="text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
+                <XCircle className="w-16 h-16 sm:w-20 sm:h-20 text-red-400 mx-auto mb-3" />
+                <h2 className="text-2xl sm:text-3xl font-black text-white">KURANG TEPAT! ❌</h2>
                 <p className="text-red-300 text-sm mt-2">
                   Jawaban benar: <strong>{questionData?.options[resultData.correctIndex]}</strong>
                 </p>
               </div>
             )}
 
-            <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-around text-center">
+            <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-around text-center">
               <div>
                 <span className="text-xs uppercase text-gray-400 font-bold block">Peringkatmu</span>
                 <span className="text-2xl font-black text-white font-mono">#{resultData.rank}</span>

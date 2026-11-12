@@ -12,7 +12,7 @@ export default defineConfig({
   ],
   vite: {
     ssr: {
-      noExternal: ['lucide-react', 'canvas-confetti'],
+      noExternal: ['lucide-react', 'canvas-confetti', 'three'],
     },
   },
 });

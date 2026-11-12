@@ -3,10 +3,11 @@ import type { PlayerSummary, QuizQuestion, AnswerStats } from '../../types/quiz'
 import { DEFAULT_QUIZZES } from '../../data/default-quizzes';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
+import RobloxArena3D from './RobloxArena3D';
 import { 
   Users, Play, ArrowRight, Trophy, RotateCcw, 
   Copy, Check, Clock, Sparkles, Volume2, VolumeX, ShieldAlert,
-  Radio, CheckCircle2
+  Radio, CheckCircle2, Flame, Zap
 } from 'lucide-react';
 
 const OPTION_THEMES = [
@@ -55,6 +56,7 @@ export default function HostRoom() {
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [robloxMode, setRobloxMode] = useState(true);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [powerupToast, setPowerupToast] = useState<{ text: string; id: number } | null>(null);
 
@@ -141,6 +143,24 @@ export default function HostRoom() {
         setAnsweredCount(msg.answeredCount || 0);
         sound.playPop();
         break;
+
+      case 'PLAYERS_POSITIONS': {
+        const posMap = new Map((msg.positions || []).map((p: any) => [p.id, p]));
+        setPlayers(prev => prev.map(pl => {
+          const pos = posMap.get(pl.id);
+          if (pos) {
+            return {
+              ...pl,
+              x: pos.x,
+              z: pos.z,
+              jumping: pos.jumping,
+              currentAnswer: pos.currentAnswer
+            };
+          }
+          return pl;
+        }));
+        break;
+      }
 
       case 'COUNTDOWN_TICK':
         setPhase('COUNTDOWN');
@@ -248,6 +268,12 @@ export default function HostRoom() {
   const restartGame = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'RESTART_GAME' }));
+    }
+  };
+
+  const skipTimer = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'SKIP_TIMER' }));
     }
   };
 
@@ -454,6 +480,17 @@ export default function HostRoom() {
           <div className="bg-gradient-to-r from-purple-900/60 via-slate-800/80 to-indigo-900/60 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur shadow-2xl mb-8 relative overflow-hidden">
             <div className="absolute top-4 right-4 flex items-center gap-2">
               <button 
+                onClick={() => setRobloxMode(!robloxMode)}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  robloxMode 
+                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md shadow-purple-600/30' 
+                    : 'bg-slate-800/80 text-gray-400 border-slate-700 hover:text-white'
+                }`}
+                title="Ganti Mode Tampilan Kuis"
+              >
+                <span>{robloxMode ? '🎮 Mode 3D Arena' : '📋 Mode Klasik'}</span>
+              </button>
+              <button 
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 className="p-2 bg-slate-800/80 hover:bg-slate-700 text-gray-300 rounded-lg border border-slate-600 text-xs"
                 title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
@@ -516,6 +553,27 @@ export default function HostRoom() {
               </div>
             </div>
           </div>
+
+          {/* Roblox 3D Arena Preview in Lobby */}
+          {robloxMode && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                    🎮 3D Color Survival Arena (Lobby Preview)
+                  </span>
+                  <span className="text-xs text-purple-300 bg-purple-500/20 px-2.5 py-0.5 rounded-full border border-purple-500/30 hidden sm:inline">
+                    Host & Pemain dapat bergerak dengan WASD / Tombol Arah
+                  </span>
+                </div>
+              </div>
+              <RobloxArena3D
+                phase="LOBBY"
+                isHost={true}
+                players={players}
+              />
+            </div>
+          )}
 
           {/* Players Area */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 backdrop-blur mb-8">
@@ -598,25 +656,48 @@ export default function HostRoom() {
         {renderFloatingReactions()}
         {renderPowerupToast()}
         <div className="max-w-5xl mx-auto py-4 px-4 pb-24">
-          {/* Top bar with Question tracker, Timer, and Answer Count */}
-          <div className="flex items-center justify-between mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
-            <div className="flex items-center gap-3">
-              <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-sm border border-purple-500/30">
-                Soal {currentQuestion.questionIndex + 1} dari {currentQuestion.totalQuestions}
+          {/* Top bar with Question tracker, Timer, Actions, and Answer Count */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl backdrop-blur">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="bg-purple-600/30 text-purple-300 font-bold px-3 py-1 rounded-xl text-xs sm:text-sm border border-purple-500/30">
+                Soal {currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
               </span>
+              <button 
+                onClick={() => setRobloxMode(!robloxMode)}
+                className={`px-3 py-1 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  robloxMode 
+                    ? 'bg-purple-600/50 text-white border-purple-400/60 shadow-md' 
+                    : 'bg-slate-800 text-gray-400 border-slate-700 hover:text-white'
+                }`}
+                title="Ganti Mode Tampilan Soal"
+              >
+                <span>{robloxMode ? '🎮 3D Arena' : '📋 Klasik'}</span>
+              </button>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-gray-400" />
-                <span className="text-sm font-medium text-gray-300">
-                  Terjawab: <strong className="text-white font-mono text-base">{answeredCount}</strong> / {players.length}
+            <div className="flex items-center gap-3 sm:gap-6">
+              {!isReview && (
+                <button
+                  type="button"
+                  onClick={skipTimer}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-extrabold text-xs rounded-xl shadow-lg border border-red-400/40 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Langsung akhiri waktu dan runtuhkan lantai yang salah"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>Runtuhkan Lantai</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-300">
+                <Users className="w-4 h-4 text-gray-400" />
+                <span>
+                  <strong className="text-white font-mono">{answeredCount}</strong>/{players.length}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Clock className={`w-5 h-5 ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
-                <span className={`text-2xl font-mono font-black ${timeLeft <= 5 ? 'text-red-400' : 'text-white'}`}>
+              <div className="flex items-center gap-1.5">
+                <Clock className={`w-4 h-4 ${timeLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`} />
+                <span className={`text-xl sm:text-2xl font-mono font-black ${timeLeft <= 5 ? 'text-red-400' : 'text-white'}`}>
                   {timeLeft}s
                 </span>
               </div>
@@ -633,54 +714,114 @@ export default function HostRoom() {
             />
           </div>
 
-          {/* Big Question Card */}
-          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-3xl p-8 mb-6 shadow-2xl text-center">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-relaxed">
-              {currentQuestion.text}
-            </h2>
-            {isReview && currentQuestion.explanation && (
-              <div className="mt-4 p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200 text-left max-w-2xl mx-auto">
-                💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
-              </div>
-            )}
-          </div>
+          {/* 3D Roblox Arena or Classic View */}
+          {robloxMode ? (
+            <div className="mb-6 space-y-4">
+              <RobloxArena3D
+                phase={phase}
+                isHost={true}
+                players={players}
+                correctIndex={isReview ? currentQuestion.correctIndex : null}
+                options={currentQuestion.options}
+                questionText={currentQuestion.text}
+                timeLeft={timeLeft}
+              />
 
-          {/* 4 Answer Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {currentQuestion.options.map((opt, idx) => {
-              const theme = OPTION_THEMES[idx];
-              const isCorrect = isReview && idx === currentQuestion.correctIndex;
-              const isIncorrect = isReview && idx !== currentQuestion.correctIndex;
-              const count = answerStats?.optionCounts?.[idx] || 0;
+              {/* Compact Options Reference Bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                {currentQuestion.options.map((opt, idx) => {
+                  const theme = OPTION_THEMES[idx];
+                  const isCorrect = isReview && idx === currentQuestion.correctIndex;
+                  const count = answerStats?.optionCounts?.[idx] || 0;
 
-              return (
-                <div
-                  key={idx}
-                  className={`p-6 rounded-2xl flex items-center justify-between text-white font-bold transition-all ${theme.bg} ${
-                    isReview 
-                      ? isCorrect
-                        ? 'ring-4 ring-white shadow-2xl scale-[1.02] opacity-100'
-                        : 'opacity-40 grayscale-[40%]'
-                      : 'shadow-lg'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xl font-mono">
-                      {theme.shape}
-                    </span>
-                    <span className="text-lg md:text-xl font-medium">{opt}</span>
-                  </div>
-
-                  {isReview && (
-                    <div className="bg-black/30 px-3 py-1 rounded-xl text-sm font-mono flex items-center gap-1.5">
-                      <Users className="w-4 h-4" />
-                      <span>{count}</span>
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-2xl flex flex-col justify-between text-white font-bold transition-all border ${theme.bg} ${
+                        isReview 
+                          ? isCorrect
+                            ? 'ring-4 ring-white shadow-2xl scale-[1.03] border-white'
+                            : 'opacity-40 grayscale-[40%] border-transparent'
+                          : 'shadow-md border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-mono bg-black/30 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                          <span>{theme.shape}</span>
+                          <span>{theme.label}</span>
+                        </span>
+                        {isReview && (
+                          <span className="bg-black/40 px-2 py-0.5 rounded-lg font-mono text-[11px] flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            <span>{count}</span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs sm:text-sm font-semibold leading-snug line-clamp-2">
+                        {opt}
+                      </p>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+
+              {isReview && currentQuestion.explanation && (
+                <div className="p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200">
+                  💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Big Question Card */}
+              <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 rounded-3xl p-8 mb-6 shadow-2xl text-center">
+                <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-relaxed">
+                  {currentQuestion.text}
+                </h2>
+                {isReview && currentQuestion.explanation && (
+                  <div className="mt-4 p-3 bg-purple-900/30 border border-purple-500/30 rounded-xl text-xs text-purple-200 text-left max-w-2xl mx-auto">
+                    💡 <strong>Penjelasan:</strong> {currentQuestion.explanation}
+                  </div>
+                )}
+              </div>
+
+              {/* 4 Answer Options */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {currentQuestion.options.map((opt, idx) => {
+                  const theme = OPTION_THEMES[idx];
+                  const isCorrect = isReview && idx === currentQuestion.correctIndex;
+                  const count = answerStats?.optionCounts?.[idx] || 0;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-6 rounded-2xl flex items-center justify-between text-white font-bold transition-all ${theme.bg} ${
+                        isReview 
+                          ? isCorrect
+                            ? 'ring-4 ring-white shadow-2xl scale-[1.02] opacity-100'
+                            : 'opacity-40 grayscale-[40%]'
+                          : 'shadow-lg'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center text-xl font-mono">
+                          {theme.shape}
+                        </span>
+                        <span className="text-lg md:text-xl font-medium">{opt}</span>
+                      </div>
+
+                      {isReview && (
+                        <div className="bg-black/30 px-3 py-1 rounded-xl text-sm font-mono flex items-center gap-1.5">
+                          <Users className="w-4 h-4" />
+                          <span>{count}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* Inter-Question Live Leaderboard */}
           {isReview && players.length > 0 && (

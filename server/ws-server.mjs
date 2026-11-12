@@ -199,11 +199,32 @@ function getPlayerList(room) {
       avatar: p.avatar,
       score: p.score,
       streak: p.streak,
-      answeredCurrent: p.currentAnswer !== null
+      answeredCurrent: p.currentAnswer !== null,
+      x: typeof p.x === 'number' ? p.x : 0,
+      z: typeof p.z === 'number' ? p.z : 0,
+      jumping: !!p.jumping,
+      currentAnswer: p.currentAnswer
     });
   }
   list.sort((a, b) => b.score - a.score);
   return list.map((p, idx) => ({ ...p, rank: idx + 1 }));
+}
+
+function broadcastPlayersPositions(room) {
+  const positions = [];
+  for (const p of room.players.values()) {
+    positions.push({
+      id: p.id,
+      x: typeof p.x === 'number' ? p.x : 0,
+      z: typeof p.z === 'number' ? p.z : 0,
+      jumping: !!p.jumping,
+      currentAnswer: p.currentAnswer
+    });
+  }
+  broadcastToRoom(room, {
+    type: 'PLAYERS_POSITIONS',
+    positions
+  });
 }
 
 function endCurrentQuestion(room) {
@@ -284,6 +305,9 @@ function startQuestion(room, index) {
     p.currentAnswer = null;
     p.answerTimeMs = null;
     p.activeDoublePoints = false;
+    p.x = (Math.random() - 0.5) * 2;
+    p.z = (Math.random() - 0.5) * 2;
+    p.jumping = false;
   }
 
   safeSend(room.hostWs, {
@@ -414,6 +438,9 @@ wss.on('connection', (ws) => {
             currentAnswer: null,
             answerTimeMs: null,
             lastReactionTime: 0,
+            x: (Math.random() - 0.5) * 2,
+            z: (Math.random() - 0.5) * 2,
+            jumping: false,
             powerups: { fiftyFifty: true, doublePoints: true },
             activeDoublePoints: false
           };
@@ -476,11 +503,23 @@ wss.on('connection', (ws) => {
           if (room.phase !== 'QUESTION') return;
 
           const player = room.players.get(boundPlayerId);
-          if (!player || player.currentAnswer !== null) return;
+          if (!player) return;
 
           const answerIndex = Number(data.answerIndex);
           player.currentAnswer = answerIndex;
           player.answerTimeMs = Date.now() - room.questionStartTime;
+
+          // Map answer index to Roblox 3D color quadrant coords
+          const quadrantCenters = [
+            { x: -6, z: -6 }, // 0: ▲ Merah
+            { x: 6, z: -6 },  // 1: ◆ Biru
+            { x: -6, z: 6 },  // 2: ● Kuning
+            { x: 6, z: 6 }    // 3: ■ Hijau
+          ];
+          if (quadrantCenters[answerIndex]) {
+            player.x = quadrantCenters[answerIndex].x + (Math.random() - 0.5) * 3;
+            player.z = quadrantCenters[answerIndex].z + (Math.random() - 0.5) * 3;
+          }
 
           safeSend(ws, { type: 'ANSWER_ACK', answerIndex });
 
@@ -491,8 +530,61 @@ wss.on('connection', (ws) => {
             totalPlayers: room.players.size
           });
 
-          if (answeredCount >= room.players.size) {
+          broadcastPlayersPositions(room);
+          break;
+        }
+
+        case 'FORCE_END_QUESTION':
+        case 'SKIP_TIMER': {
+          if (!isHost || !boundRoom) return;
+          const room = boundRoom;
+          if (room.phase === 'QUESTION') {
             endCurrentQuestion(room);
+          }
+          break;
+        }
+
+        case 'PLAYER_MOVE': {
+          if (!boundRoom || !boundPlayerId) return;
+          const room = boundRoom;
+          const player = room.players.get(boundPlayerId);
+          if (!player) return;
+
+          const now = Date.now();
+          if (typeof data.x === 'number') player.x = data.x;
+          if (typeof data.z === 'number') player.z = data.z;
+          if (typeof data.jumping === 'boolean') player.jumping = data.jumping;
+
+          // If answerIndex is passed from walking into a color quadrant
+          if (room.phase === 'QUESTION') {
+            if (typeof data.answerIndex === 'number' && data.answerIndex >= 0 && data.answerIndex <= 3) {
+              if (player.currentAnswer !== data.answerIndex) {
+                player.currentAnswer = data.answerIndex;
+                player.answerTimeMs = Date.now() - room.questionStartTime;
+                safeSend(ws, { type: 'ANSWER_ACK', answerIndex: data.answerIndex });
+
+                const answeredCount = Array.from(room.players.values()).filter(p => p.currentAnswer !== null).length;
+                safeSend(room.hostWs, {
+                  type: 'PLAYER_ANSWERED_UPDATE',
+                  answeredCount,
+                  totalPlayers: room.players.size
+                });
+              }
+            } else if (data.answerIndex === null && player.currentAnswer !== null) {
+              // Stepped back to center pad
+              player.currentAnswer = null;
+              const answeredCount = Array.from(room.players.values()).filter(p => p.currentAnswer !== null).length;
+              safeSend(room.hostWs, {
+                type: 'PLAYER_ANSWERED_UPDATE',
+                answeredCount,
+                totalPlayers: room.players.size
+              });
+            }
+          }
+
+          if (now - (player.lastMoveBroadcast || 0) >= 50) {
+            player.lastMoveBroadcast = now;
+            broadcastPlayersPositions(room);
           }
           break;
         }
@@ -525,6 +617,9 @@ wss.on('connection', (ws) => {
             p.streak = 0;
             p.currentAnswer = null;
             p.answerTimeMs = null;
+            p.x = (Math.random() - 0.5) * 2;
+            p.z = (Math.random() - 0.5) * 2;
+            p.jumping = false;
             p.powerups = { fiftyFifty: true, doublePoints: true };
             p.activeDoublePoints = false;
           }

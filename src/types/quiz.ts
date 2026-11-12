@@ -26,6 +26,10 @@ export interface PlayerSummary {
   streak: number;
   rank?: number;
   answeredCurrent?: boolean;
+  x?: number;
+  z?: number;
+  jumping?: boolean;
+  currentAnswer?: number | null;
 }
 
 export interface AnswerStats {
