@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode } from '../../types/quiz';
+import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode, WorldTheme } from '../../types/quiz';
 import { DEFAULT_QUIZZES } from '../../data/default-quizzes';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
@@ -18,6 +18,14 @@ const OPTION_THEMES = [
 ];
 
 const REACTION_EMOJIS = ['❤️', '🔥', '🎉', '👏', '😱', '🚀'];
+
+const QUIZ_THEME_RECOMMENDATIONS: Record<string, { theme: WorldTheme; label: string; icon: string }> = {
+  'history-ocean-mystery': { theme: 'pirate', label: 'Tema Bajak Laut Hiu', icon: '🏝️' },
+  'general-science': { theme: 'space', label: 'Tema Antariksa Kosmik', icon: '🚀' },
+  'brain-teasers-logic': { theme: 'castle', label: 'Tema Kastil Kuno', icon: '🏰' },
+  'pop-culture-gaming': { theme: 'arcade', label: 'Tema Arcade Toybox', icon: '🕹️' },
+  'web-dev-trivia': { theme: 'arcade', label: 'Tema Arcade Toybox', icon: '🕹️' },
+};
 
 interface FloatingReaction {
   id: string;
@@ -56,6 +64,7 @@ export default function HostRoom() {
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
+  const [worldTheme, setWorldTheme] = useState<WorldTheme>('arcade');
   const [bombHolderId, setBombHolderId] = useState<string | null>(null);
   const [explodedPlayerId, setExplodedPlayerId] = useState<string | null>(null);
   const [bombToast, setBombToast] = useState<{ text: string; id: number } | null>(null);
@@ -91,7 +100,13 @@ export default function HostRoom() {
       if (pendingCreateQuizIdRef.current) {
         const pendingQuizId = pendingCreateQuizIdRef.current;
         pendingCreateQuizIdRef.current = null;
-        ws.send(JSON.stringify({ type: 'CREATE_ROOM', quizId: pendingQuizId, gameMode }));
+        let selectedTheme = worldTheme;
+        if (worldTheme === 'arcade') {
+          if (pendingQuizId === 'history-ocean-mystery') selectedTheme = 'pirate';
+          else if (pendingQuizId === 'general-science') selectedTheme = 'space';
+          else if (pendingQuizId === 'brain-teasers-logic') selectedTheme = 'castle';
+        }
+        ws.send(JSON.stringify({ type: 'CREATE_ROOM', quizId: pendingQuizId, gameMode, worldTheme: selectedTheme }));
       }
     };
 
@@ -150,11 +165,17 @@ export default function HostRoom() {
         setRoomCode(msg.code);
         setQuizMeta({ title: msg.quiz.title, count: msg.quiz.questionCount });
         if (msg.gameMode) setGameMode(msg.gameMode);
+        if (msg.worldTheme) setWorldTheme(msg.worldTheme);
         setPhase('LOBBY');
         break;
 
       case 'GAME_MODE_UPDATED':
         if (msg.gameMode) setGameMode(msg.gameMode);
+        sound.playPop();
+        break;
+
+      case 'WORLD_THEME_UPDATED':
+        if (msg.worldTheme) setWorldTheme(msg.worldTheme);
         sound.playPop();
         break;
 
@@ -294,8 +315,16 @@ export default function HostRoom() {
 
   const createRoom = (quizId: string) => {
     setErrorMsg(null);
+    let selectedTheme = worldTheme;
+    if (worldTheme === 'arcade') {
+      if (quizId === 'history-ocean-mystery') selectedTheme = 'pirate';
+      else if (quizId === 'general-science') selectedTheme = 'space';
+      else if (quizId === 'brain-teasers-logic') selectedTheme = 'castle';
+      setWorldTheme(selectedTheme);
+    }
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode }));
+      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode, worldTheme: selectedTheme }));
     } else {
       pendingCreateQuizIdRef.current = quizId;
       connectWs();
@@ -307,6 +336,86 @@ export default function HostRoom() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
       wsRef.current.send(JSON.stringify({ type: 'SET_GAME_MODE', gameMode: newMode }));
     }
+  };
+
+  const changeWorldTheme = (newTheme: WorldTheme) => {
+    setWorldTheme(newTheme);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(JSON.stringify({ type: 'SET_WORLD_THEME', worldTheme: newTheme }));
+    }
+  };
+
+  const renderWorldThemeSelector = (compact = false) => {
+    const themes: { id: WorldTheme; label: string; icon: string; desc: string; tag: string }[] = [
+      { id: 'arcade', label: 'Arcade Toybox', icon: '🕹️', desc: 'Atmosfer neon cyber & lautan lava magma menyala', tag: 'Neon & Magma' },
+      { id: 'pirate', label: 'Bajak Laut Hiu', icon: '🏝️', desc: 'Dek kayu kapal, samudra biru & 3 sirip hiu berputar', tag: 'Samudra & Hiu' },
+      { id: 'space', label: 'Stasiun Antariksa', icon: '🚀', desc: 'Lantai pelat orbital, 350 bintang kosmik & cincin neon', tag: 'Kosmik & Cincin' },
+      { id: 'castle', label: 'Kastil Kuno', icon: '🏰', desc: 'Lantai batu cobblestone, parit air lumut & 4 pilar obor api', tag: 'Benteng & Obor' },
+    ];
+
+    if (compact) {
+      return (
+        <div className="flex items-center gap-1 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+          {themes.map(t => {
+            const isSelected = worldTheme === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => changeWorldTheme(t.id)}
+                className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                  isSelected
+                    ? 'bg-amber-400 text-slate-950 border-black shadow-[1px_1px_0px_#000]'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800 border-transparent'
+                }`}
+                title={t.desc}
+              >
+                <span>{t.icon}</span>
+                <span className="hidden lg:inline">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-8">
+        <h3 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>PILIH TEMA DUNIA 3D ARENA:</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {themes.map(t => {
+            const isSelected = worldTheme === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setWorldTheme(t.id)}
+                className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer relative flex flex-col justify-between iso-tile ${
+                  isSelected
+                    ? 'bg-amber-400 text-slate-950 shadow-[6px_6px_0px_#000] scale-[1.02]'
+                    : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[4px_4px_0px_#000]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl p-1.5 rounded-lg bg-black/10 border border-black/20">{t.icon}</span>
+                  <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded ${
+                    isSelected ? 'bg-black text-amber-400' : 'bg-[#0b0f19] text-slate-300 border border-black'
+                  }`}>
+                    {isSelected ? 'TEMA AKTIF' : t.tag}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="font-['Space_Grotesk',sans-serif] font-black text-sm mb-1">{t.label}</h4>
+                  <p className="text-xs opacity-90 leading-snug">{t.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderModeSelector = (compact = false) => {
@@ -545,37 +654,49 @@ export default function HostRoom() {
         {/* Mode Selector Neo-Brutalist */}
         {renderModeSelector(false)}
 
-        {/* Grid Paket Soal */}
-        <div className="grid md:grid-cols-2 gap-5">
-          {availableQuizzes.map((quiz) => (
-            <div 
-              key={quiz.id}
-              className="iso-card p-6 flex flex-col justify-between bg-[#151c2c]"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
-                    PAKET KUIS
-                  </span>
-                  <span className="text-xs font-mono font-bold text-slate-300 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
-                    {quiz.questionCount} SOAL
-                  </span>
-                </div>
-                <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">{quiz.title}</h2>
-                <p className="text-slate-300 text-sm leading-relaxed mb-6 font-medium">
-                  {quiz.description}
-                </p>
-              </div>
+        {/* World Theme Selector Neo-Brutalist */}
+        {renderWorldThemeSelector(false)}
 
-              <button
-                type="button"
-                onClick={() => createRoom(quiz.id)}
-                className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl iso-btn flex items-center justify-center gap-2 cursor-pointer"
+        {/* Grid Paket Soal */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {availableQuizzes.map((quiz) => {
+            const rec = QUIZ_THEME_RECOMMENDATIONS[quiz.id];
+            return (
+              <div 
+                key={quiz.id}
+                className="iso-card p-6 flex flex-col justify-between bg-[#151c2c]"
               >
-                <span>Buka Room Kuis Ini</span>
-              </button>
-            </div>
-          ))}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+                      PAKET KUIS
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-300 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">
+                      {quiz.questionCount} SOAL
+                    </span>
+                  </div>
+                  <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-bold text-white mb-2">{quiz.title}</h2>
+                  <p className="text-slate-300 text-sm leading-relaxed mb-4 font-medium">
+                    {quiz.description}
+                  </p>
+                  {rec && (
+                    <div className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0b0f19] border border-black text-xs font-mono text-amber-300 shadow-[1px_1px_0px_#000]">
+                      <span>{rec.icon}</span>
+                      <span>Arena: <strong>{rec.label}</strong></span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => createRoom(quiz.id)}
+                  className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3 px-4 rounded-xl iso-btn flex items-center justify-center gap-2 cursor-pointer mt-2"
+                >
+                  <span>Buka Room Kuis Ini</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -596,8 +717,9 @@ export default function HostRoom() {
               <p className="text-slate-300 text-xs font-mono font-bold uppercase tracking-wider">
                 Buka di browser: <span className="text-amber-400 bg-[#0b0f19] px-2 py-0.5 rounded border border-black">/play</span> atau scan QR
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {renderModeSelector(true)}
+                {renderWorldThemeSelector(true)}
                 <button 
                   type="button"
                   onClick={() => setSoundEnabled(!soundEnabled)}
@@ -682,6 +804,7 @@ export default function HostRoom() {
                   explodedPlayerId={explodedPlayerId}
                   isHost={true}
                   players={players}
+                  worldTheme={worldTheme}
                 />
               </div>
             </div>
@@ -770,11 +893,12 @@ export default function HostRoom() {
         <div className="max-w-5xl mx-auto py-4 px-4 pb-24">
           {/* Top Scoreboard Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4 arcade-card p-3.5 bg-[#151c2c]">
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className="bg-[#0b0f19] text-amber-400 font-mono font-bold px-3 py-1.5 rounded-lg text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000]">
                 SOAL {currentQuestion.questionIndex + 1}/{currentQuestion.totalQuestions}
               </span>
               {renderModeSelector(true)}
+              {renderWorldThemeSelector(true)}
             </div>
 
             <div className="flex items-center gap-3 sm:gap-5">
@@ -831,6 +955,7 @@ export default function HostRoom() {
                   options={currentQuestion.options}
                   questionText={currentQuestion.text}
                   timeLeft={timeLeft}
+                  worldTheme={worldTheme}
                 />
               </div>
 

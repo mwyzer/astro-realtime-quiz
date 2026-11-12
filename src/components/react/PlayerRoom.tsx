@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GameMode } from '../../types/quiz';
+import type { GameMode, WorldTheme } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
@@ -46,6 +46,7 @@ export default function PlayerRoom() {
 
   // Game Mode & 3D Arena Players
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
+  const [worldTheme, setWorldTheme] = useState<WorldTheme>('arcade');
   const [bombHolderId, setBombHolderId] = useState<string | null>(null);
   const [explodedPlayerId, setExplodedPlayerId] = useState<string | null>(null);
   const [bombToast, setBombToast] = useState<{ text: string; id: number } | null>(null);
@@ -137,6 +138,7 @@ export default function PlayerRoom() {
         setPlayerId(msg.playerId);
         setRoomCode(msg.code);
         if (msg.gameMode) setGameMode(msg.gameMode);
+        if (msg.worldTheme) setWorldTheme(msg.worldTheme);
         if (msg.bombHolderId) setBombHolderId(msg.bombHolderId);
         setPhase('LOBBY');
         setErrorMsg(null);
@@ -154,6 +156,11 @@ export default function PlayerRoom() {
 
       case 'GAME_MODE_UPDATED':
         if (msg.gameMode) setGameMode(msg.gameMode);
+        sound.playPop();
+        break;
+
+      case 'WORLD_THEME_UPDATED':
+        if (msg.worldTheme) setWorldTheme(msg.worldTheme);
         sound.playPop();
         break;
 
@@ -673,6 +680,7 @@ export default function PlayerRoom() {
                     explodedPlayerId={explodedPlayerId}
                     localPlayerId={playerId}
                     players={arenaPlayers}
+                    worldTheme={worldTheme}
                     onMove={handlePlayerMove}
                   />
                 </div>
@@ -795,6 +803,7 @@ export default function PlayerRoom() {
                 options={questionData.options}
                 questionText={questionData.text}
                 timeLeft={timeLeft}
+                worldTheme={worldTheme}
                 onMove={handlePlayerMove}
                 onSelectZone={submitAnswer}
                 selectedZone={selectedOption}
@@ -1014,6 +1023,7 @@ export default function PlayerRoom() {
                   correctIndex={resultData.correctIndex}
                   options={questionData?.options}
                   questionText={questionData?.text}
+                  worldTheme={worldTheme}
                 />
               </div>
             </div>

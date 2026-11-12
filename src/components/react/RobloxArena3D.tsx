@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import type { WorldTheme } from '../../types/quiz';
 
 export interface Player3DData {
   id: string;
@@ -17,6 +18,7 @@ export type Arena3DMode = 'bomb_tag' | 'glass_bridge' | 'lava_tiles';
 interface RobloxArena3DProps {
   phase: string;
   arenaMode?: Arena3DMode;
+  worldTheme?: WorldTheme;
   bombHolderId?: string | null;
   explodedPlayerId?: string | null;
   isHost?: boolean;
@@ -46,6 +48,7 @@ const TORSO_COLORS = [
 export default function RobloxArena3D({
   phase,
   arenaMode = 'bomb_tag',
+  worldTheme = 'arcade',
   bombHolderId = null,
   explodedPlayerId = null,
   isHost = false,
@@ -156,15 +159,30 @@ export default function RobloxArena3D({
     const isBridge = arenaMode === 'glass_bridge';
     const isBomb = arenaMode === 'bomb_tag';
 
-    if (isBridge) {
-      scene.background = new THREE.Color(0x090d16); // deep cyber abyss
-      scene.fog = new THREE.FogExp2(0x090d16, 0.016);
-    } else if (isBomb) {
-      scene.background = new THREE.Color(0x09090b); // dark industrial arena
-      scene.fog = new THREE.FogExp2(0x09090b, 0.015);
+    const isPirate = worldTheme === 'pirate';
+    const isSpace = worldTheme === 'space';
+    const isCastle = worldTheme === 'castle';
+
+    if (isSpace) {
+      scene.background = new THREE.Color(0x030712); // cosmic void
+      scene.fog = new THREE.FogExp2(0x030712, 0.008);
+    } else if (isPirate) {
+      scene.background = new THREE.Color(0x082f49); // ocean twilight sky
+      scene.fog = new THREE.FogExp2(0x082f49, 0.012);
+    } else if (isCastle) {
+      scene.background = new THREE.Color(0x111827); // medieval fortress night
+      scene.fog = new THREE.FogExp2(0x111827, 0.014);
     } else {
-      scene.background = new THREE.Color(0x0f172a); // dark midnight blue
-      scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
+      if (isBridge) {
+        scene.background = new THREE.Color(0x090d16); // deep cyber abyss
+        scene.fog = new THREE.FogExp2(0x090d16, 0.016);
+      } else if (isBomb) {
+        scene.background = new THREE.Color(0x09090b); // dark industrial arena
+        scene.fog = new THREE.FogExp2(0x09090b, 0.015);
+      } else {
+        scene.background = new THREE.Color(0x0b0f19); // arcade dark slate
+        scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+      }
     }
 
     // Adaptive Frustum Size for Isometric Orthographic Camera
@@ -230,11 +248,12 @@ export default function RobloxArena3D({
     fillLight.position.set(-20, 15, -20);
     scene.add(fillLight);
 
-    // Dynamic light underneath
+    // Dynamic light underneath themed
+    const underLightColor = isSpace ? 0x06b6d4 : (isPirate ? 0x0284c7 : (isCastle ? 0x064e3b : (isBridge ? 0x6366f1 : (isBomb ? 0xf59e0b : 0xff3b00))));
     const underLight = new THREE.PointLight(
-      isBridge ? 0x6366f1 : (isBomb ? 0xf59e0b : 0xff3b00),
+      underLightColor,
       isBridge ? 2.5 : (isBomb ? 2.0 : 2.5),
-      60
+      70
     );
     underLight.position.set(0, -3.5, 0);
     scene.add(underLight);
@@ -244,6 +263,13 @@ export default function RobloxArena3D({
     const canvasTextures: THREE.CanvasTexture[] = [];
     let trophyGroup: THREE.Group | null = null;
     let lavaMesh: THREE.Mesh | null = null;
+
+    // Theme Specific References
+    const sharkFins: THREE.Mesh[] = [];
+    let starField: THREE.Points | null = null;
+    let orbitalRing: THREE.Mesh | null = null;
+    const torchLights: THREE.PointLight[] = [];
+    const torchFlames: THREE.Mesh[] = [];
 
     // Bomb Tag Specific References
     let bombGroup: THREE.Group | null = null;
@@ -321,23 +347,24 @@ export default function RobloxArena3D({
       // -------------------------------------------------------------
       // 3A. BOMB TAG ARENA (Hot Potato Trivia Mode)
       // -------------------------------------------------------------
-      // Main Ground Platform: 24x24 arena
+      // Main Ground Platform: 24x24 arena with World Theme styling
+      const floorColor = isPirate ? 0x78350f : (isSpace ? 0x1e293b : (isCastle ? 0x334155 : 0x18181b));
       const floorGeo = new THREE.BoxGeometry(24, 0.8, 24);
       const floorMat = new THREE.MeshStandardMaterial({
-        color: 0x18181b,
-        roughness: 0.6,
-        metalness: 0.2,
+        color: floorColor,
+        roughness: isSpace ? 0.3 : 0.6,
+        metalness: isSpace ? 0.6 : 0.2,
       });
       const floorMesh = new THREE.Mesh(floorGeo, floorMat);
       floorMesh.position.set(0, -0.4, 0);
       floorMesh.receiveShadow = true;
       scene.add(floorMesh);
 
-      // Yellow-Black Hazard Perimeter Bars
-      const hazardColor = 0xeab308;
+      // Hazard / Accent Perimeter Bars
+      const hazardColor = isPirate ? 0xf59e0b : (isSpace ? 0x06b6d4 : (isCastle ? 0xb45309 : 0xeab308));
       const borderThickness = 0.35;
       const borderHeight = 0.45;
-      const borderMat = new THREE.MeshStandardMaterial({ color: hazardColor, roughness: 0.4, metalness: 0.3 });
+      const borderMat = new THREE.MeshStandardMaterial({ color: hazardColor, roughness: 0.4, metalness: 0.4 });
 
       // North & South borders
       [-12, 12].forEach(bz => {
@@ -492,23 +519,25 @@ export default function RobloxArena3D({
       // -------------------------------------------------------------
       // 3B. GLASS BRIDGE GEOMETRY (Squid Game / Bridge Trivia Mode)
       // -------------------------------------------------------------
-      const abyssGeo = new THREE.PlaneGeometry(120, 120);
-      const abyssMat = new THREE.MeshBasicMaterial({ color: 0x050811 });
+      const abyssColor = isPirate ? 0x0284c7 : (isSpace ? 0x030712 : (isCastle ? 0x134e4a : 0x050811));
+      const abyssGeo = new THREE.PlaneGeometry(160, 160);
+      const abyssMat = new THREE.MeshBasicMaterial({ color: abyssColor });
       const abyssMesh = new THREE.Mesh(abyssGeo, abyssMat);
       abyssMesh.rotation.x = -Math.PI / 2;
       abyssMesh.position.y = -8.5;
       scene.add(abyssMesh);
 
-      const gridHelper = new THREE.GridHelper(120, 36, 0x6366f1, 0x1e1b4b);
+      const gridHelper = new THREE.GridHelper(120, 36, isSpace ? 0x06b6d4 : (isPirate ? 0x38bdf8 : 0x6366f1), 0x1e1b4b);
       gridHelper.position.y = -8.2;
       scene.add(gridHelper);
 
-      // Start Platform
+      // Start Platform with Theme styling
+      const startColor = isPirate ? 0x78350f : (isSpace ? 0x1e293b : (isCastle ? 0x334155 : 0x1e293b));
       const startPlatformGeo = new THREE.BoxGeometry(20, 0.8, 4.5);
       const startPlatformMat = new THREE.MeshStandardMaterial({
-        color: 0x1e293b,
+        color: startColor,
         roughness: 0.4,
-        metalness: 0.3,
+        metalness: isSpace ? 0.6 : 0.3,
       });
       const startPlatform = new THREE.Mesh(startPlatformGeo, startPlatformMat);
       startPlatform.position.set(0, 0, 7.2);
@@ -516,8 +545,9 @@ export default function RobloxArena3D({
       scene.add(startPlatform);
 
       // Start Neon Edge line
+      const neonColor = isPirate ? 0xf59e0b : (isSpace ? 0x06b6d4 : (isCastle ? 0xb45309 : 0xa855f7));
       const startNeonGeo = new THREE.BoxGeometry(20.1, 0.08, 0.15);
-      const startNeonMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+      const startNeonMat = new THREE.MeshBasicMaterial({ color: neonColor });
       const startNeon = new THREE.Mesh(startNeonGeo, startNeonMat);
       startNeon.position.set(0, 0.42, 5.0);
       scene.add(startNeon);
@@ -660,12 +690,14 @@ export default function RobloxArena3D({
       // 3C. LAVA TILES ARENA (Classic Answer or Fall Mode)
       // -------------------------------------------------------------
       const lavaGeo = new THREE.PlaneGeometry(120, 120, 16, 16);
+      const lavaColor = isPirate ? 0x0284c7 : (isSpace ? 0x030712 : (isCastle ? 0x134e4a : 0xff3300));
+      const emissiveColor = isPirate ? 0x0369a1 : (isSpace ? 0x020617 : (isCastle ? 0x064e3b : 0xff2200));
       const lavaMat = new THREE.MeshStandardMaterial({
-        color: 0xff3300,
-        emissive: 0xff2200,
-        emissiveIntensity: 0.8,
-        roughness: 0.3,
-        metalness: 0.1,
+        color: lavaColor,
+        emissive: emissiveColor,
+        emissiveIntensity: isSpace ? 0.2 : (isPirate ? 0.45 : 0.8),
+        roughness: isPirate ? 0.15 : 0.3,
+        metalness: isPirate ? 0.4 : 0.1,
       });
       lavaMesh = new THREE.Mesh(lavaGeo, lavaMat);
       lavaMesh.rotation.x = -Math.PI / 2;
@@ -673,11 +705,12 @@ export default function RobloxArena3D({
       scene.add(lavaMesh);
 
       // Center Neutral Spawn Pad
+      const centerPadColor = isPirate ? 0x78350f : (isSpace ? 0x1e293b : (isCastle ? 0x334155 : 0x1e293b));
       const centerPadGeo = new THREE.BoxGeometry(3.6, 0.9, 3.6);
       const centerPadMat = new THREE.MeshStandardMaterial({
-        color: 0x1e293b,
+        color: centerPadColor,
         roughness: 0.5,
-        metalness: 0.4,
+        metalness: isSpace ? 0.6 : 0.4,
       });
       const centerPad = new THREE.Mesh(centerPadGeo, centerPadMat);
       centerPad.position.set(0, 0.05, 0);
@@ -700,7 +733,7 @@ export default function RobloxArena3D({
         cctx.fillText('SPAWN', 128, 120);
         cctx.font = 'bold 22px Arial, sans-serif';
         cctx.fillStyle = '#c084fc';
-        cctx.fillText('Lava Arena', 128, 165);
+        cctx.fillText('Arena Pad', 128, 165);
       }
       const centerTex = new THREE.CanvasTexture(centerCanvas);
       canvasTextures.push(centerTex);
@@ -735,6 +768,78 @@ export default function RobloxArena3D({
         tileMesh.receiveShadow = true;
         scene.add(tileMesh);
         interactiveMeshes.push(tileMesh);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D. WORLD THEME DECORATIVE ENVIRONMENT ELEMENTS
+    // -------------------------------------------------------------
+    // 1. Pirate Theme: 3 Animated Shark Fins swimming in the waters
+    if (isPirate) {
+      const finMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.2 });
+      for (let i = 0; i < 3; i++) {
+        const finGeo = new THREE.ConeGeometry(0.5, 1.25, 4);
+        finGeo.rotateX(0.28);
+        const fin = new THREE.Mesh(finGeo, finMat);
+        fin.castShadow = true;
+        scene.add(fin);
+        sharkFins.push(fin);
+      }
+    }
+
+    // 2. Space Theme: Cosmic Starfield Points & Rotating Orbital Ring
+    if (isSpace) {
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 350;
+      const starPos = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount * 3; i += 3) {
+        starPos[i] = (Math.random() - 0.5) * 160;
+        starPos[i + 1] = Math.random() * 80 - 15;
+        starPos[i + 2] = (Math.random() - 0.5) * 160;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0x67e8f9, size: 1.1, transparent: true, opacity: 0.85 });
+      starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
+
+      const ringGeo = new THREE.TorusGeometry(19, 0.22, 8, 48);
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: 0x06b6d4,
+        emissive: 0x0891b2,
+        emissiveIntensity: 0.6,
+        roughness: 0.3,
+        metalness: 0.8
+      });
+      orbitalRing = new THREE.Mesh(ringGeo, ringMat);
+      orbitalRing.rotation.x = Math.PI / 3.2;
+      scene.add(orbitalRing);
+    }
+
+    // 3. Castle Theme: 4 Flaming Torch Pillars at the Stage Corners
+    if (isCastle) {
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7, metalness: 0.2 });
+      const flameMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+      const torchCoords = [
+        { x: -11.5, z: -11.5 },
+        { x: 11.5, z: -11.5 },
+        { x: -11.5, z: 11.5 },
+        { x: 11.5, z: 11.5 }
+      ];
+      torchCoords.forEach(c => {
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 2.4, 8), stoneMat);
+        pillar.position.set(c.x, 0.8, c.z);
+        pillar.castShadow = true;
+        scene.add(pillar);
+
+        const flame = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 1), flameMat);
+        flame.position.set(c.x, 2.2, c.z);
+        scene.add(flame);
+        torchFlames.push(flame);
+
+        const tLight = new THREE.PointLight(0xf97316, 2.0, 16);
+        tLight.position.set(c.x, 2.4, c.z);
+        scene.add(tLight);
+        torchLights.push(tLight);
       });
     }
 
@@ -1199,6 +1304,31 @@ export default function RobloxArena3D({
         });
       }
 
+      // Theme-specific environment animations
+      if (sharkFins.length > 0) {
+        const sharkY = isBridge ? -7.8 : -3.9;
+        sharkFins.forEach((fin, idx) => {
+          const angle = time * 0.75 + (idx * Math.PI * 2) / 3;
+          const r = 16.5 + Math.sin(time * 1.5 + idx) * 1.5;
+          fin.position.set(Math.sin(angle) * r, sharkY + Math.sin(time * 3 + idx) * 0.1, Math.cos(angle) * r);
+          fin.rotation.y = angle + Math.PI / 2;
+        });
+      }
+
+      if (orbitalRing) {
+        orbitalRing.rotation.z = time * 0.12;
+      }
+
+      if (torchLights.length > 0) {
+        torchLights.forEach((tLight, idx) => {
+          tLight.intensity = 1.8 + Math.sin(time * 12 + idx * 2) * 0.4;
+        });
+        torchFlames.forEach((flame, idx) => {
+          const scale = 1.0 + Math.sin(time * 14 + idx * 2) * 0.15;
+          flame.scale.set(scale, scale * 1.25, scale);
+        });
+      }
+
       if (isIsometricRef.current) {
         if (isBridge) {
           orthoCamera.position.set(22, 20, 18);
@@ -1250,7 +1380,7 @@ export default function RobloxArena3D({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [arenaMode]);
+  }, [arenaMode, worldTheme]);
 
   const isLocalHoldingBomb = isBombTag && (
     bombHolderId === localPlayerId ||
@@ -1263,16 +1393,20 @@ export default function RobloxArena3D({
       {/* 3D WebGL Canvas Container */}
       <div ref={mountRef} className="w-full h-[400px] sm:h-[480px] md:h-[540px] cursor-grab active:cursor-grabbing" />
 
-      {/* Mode Indicator Badge & Camera Toggle */}
-      <div className="absolute top-3 left-3 flex items-center gap-2 z-20">
-        <span className="bg-[#0b0f19] border-2 border-black px-3 py-1 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 uppercase tracking-wider">
+      {/* Mode Indicator Badge, World Theme Badge & Camera Toggle */}
+      <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 sm:gap-2 z-20">
+        <span className="bg-[#0b0f19] border-2 border-black px-2.5 sm:px-3 py-1 rounded-xl text-xs font-mono font-bold text-amber-400 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 uppercase tracking-wider">
           {arenaMode === 'bomb_tag' ? '💣 Estafet Bom 3D' : arenaMode === 'glass_bridge' ? '🌉 Jembatan Kaca 3D' : '🌋 Lantai Lava 3D'}
+        </span>
+
+        <span className="bg-[#0b0f19] border-2 border-black px-2 sm:px-2.5 py-1 rounded-xl text-xs font-mono font-bold text-white shadow-[2px_2px_0px_#000] flex items-center gap-1 uppercase tracking-wider">
+          {worldTheme === 'pirate' ? '🏝️ Samudra Hiu' : worldTheme === 'space' ? '🚀 Antariksa' : worldTheme === 'castle' ? '🏰 Kastil Kuno' : '🕹️ Arcade'}
         </span>
 
         <button
           type="button"
           onClick={() => setIsIsometric(prev => !prev)}
-          className="bg-[#0b0f19] hover:bg-slate-800 text-amber-400 border-2 border-black px-3 py-1 rounded-xl text-xs font-mono font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer iso-btn active:translate-x-[1px] active:translate-y-[1px]"
+          className="bg-[#0b0f19] hover:bg-slate-800 text-amber-400 border-2 border-black px-2.5 sm:px-3 py-1 rounded-xl text-xs font-mono font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer iso-btn active:translate-x-[1px] active:translate-y-[1px]"
           title="Ganti Sudut Pandang Kamera (Isometrik / Perspektif)"
         >
           <span>{isIsometric ? '📐 Isometrik' : '🎥 Perspektif'}</span>

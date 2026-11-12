@@ -1,4 +1,4 @@
-import{c as p,j as e,C as J}from"./clock.CCw9H-0t.js";import{r as l}from"./index.CVf8TyFT.js";import{D as G,A as U,C as R}from"./check.DCHaNb3P.js";import{a as V,C as X,S as Z}from"./sparkles.DqgIl1hX.js";/**
+import{c as p,j as e,C as J}from"./clock.CCw9H-0t.js";import{r as l}from"./index.CVf8TyFT.js";import{D as G,A as U,C as R}from"./check.D2I8Wf7K.js";import{a as V,C as X,S as Z}from"./sparkles.DqgIl1hX.js";/**
  * @license lucide-react v0.454.0 - ISC
  *
  * This source code is licensed under the ISC license.

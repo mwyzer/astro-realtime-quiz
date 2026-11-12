@@ -20,6 +20,8 @@ export type RoomPhase = 'LOBBY' | 'COUNTDOWN' | 'QUESTION' | 'REVIEW' | 'LEADERB
 
 export type GameMode = 'bomb_tag' | 'glass_bridge' | 'lava_tiles' | 'classic';
 
+export type WorldTheme = 'arcade' | 'pirate' | 'space' | 'castle';
+
 export interface PlayerSummary {
   id: string;
   name: string;

@@ -450,12 +450,15 @@ wss.on('connection', (ws) => {
           const selectedQuiz = quizzes.find(q => q.id === data.quizId) || quizzes[0];
           const code = generateRoomCode();
           const gameMode = ['bomb_tag', 'glass_bridge', 'lava_tiles', 'classic'].includes(data.gameMode) ? data.gameMode : 'bomb_tag';
+          const validThemes = ['arcade', 'pirate', 'space', 'castle'];
+          const worldTheme = validThemes.includes(data.worldTheme) ? data.worldTheme : 'arcade';
           
           const room = {
             code,
             hostWs: ws,
             quiz: selectedQuiz,
             gameMode,
+            worldTheme,
             bombHolderId: null,
             lastBombPassTime: 0,
             phase: 'LOBBY',
@@ -474,6 +477,7 @@ wss.on('connection', (ws) => {
             type: 'ROOM_CREATED',
             code,
             gameMode: room.gameMode,
+            worldTheme: room.worldTheme,
             quiz: {
               id: selectedQuiz.id,
               title: selectedQuiz.title,
@@ -481,7 +485,7 @@ wss.on('connection', (ws) => {
               questionCount: selectedQuiz.questions.length
             }
           });
-          console.log(`[WS] Room created: ${code} (Mode: ${room.gameMode}) with quiz "${selectedQuiz.title}"`);
+          console.log(`[WS] Room created: ${code} (Mode: ${room.gameMode}, Theme: ${room.worldTheme}) with quiz "${selectedQuiz.title}"`);
           break;
         }
 
@@ -539,6 +543,7 @@ wss.on('connection', (ws) => {
             code,
             name,
             gameMode: room.gameMode,
+            worldTheme: room.worldTheme,
             quizTitle: room.quiz.title,
             questionCount: room.quiz.questions.length
           });
@@ -549,7 +554,7 @@ wss.on('connection', (ws) => {
             players
           });
 
-          console.log(`[WS] Player ${name} joined room ${code} (Mode: ${room.gameMode})`);
+          console.log(`[WS] Player ${name} joined room ${code} (Mode: ${room.gameMode}, Theme: ${room.worldTheme})`);
           break;
         }
 
@@ -577,6 +582,20 @@ wss.on('connection', (ws) => {
             });
             broadcastPlayersPositions(boundRoom);
             console.log(`[WS] Room ${boundRoom.code} gameMode changed to ${mode}`);
+          }
+          break;
+        }
+
+        case 'SET_WORLD_THEME': {
+          if (!isHost || !boundRoom) return;
+          const theme = data.worldTheme;
+          if (['arcade', 'pirate', 'space', 'castle'].includes(theme)) {
+            boundRoom.worldTheme = theme;
+            broadcastToRoom(boundRoom, {
+              type: 'WORLD_THEME_UPDATED',
+              worldTheme: boundRoom.worldTheme
+            });
+            console.log(`[WS] Room ${boundRoom.code} worldTheme changed to ${theme}`);
           }
           break;
         }
