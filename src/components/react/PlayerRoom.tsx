@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GameMode, WorldTheme } from '../../types/quiz';
+import type { GameMode, WorldTheme, PlayerSummary, PostGameAward } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
+import PodiumArena3D from './PodiumArena3D';
 import { 
   Gamepad2, CheckCircle2, XCircle, Clock, 
   Flame, Award, AlertCircle, Sparkles, Send, Radio,
@@ -95,6 +96,8 @@ export default function PlayerRoom() {
   } | null>(null);
 
   const [finalRank, setFinalRank] = useState<{ rank: number; score: number; totalPlayers: number } | null>(null);
+  const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
+  const [postGameAwards, setPostGameAwards] = useState<PostGameAward[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Check URL query parameters (e.g. ?pin=123456)
@@ -342,29 +345,38 @@ export default function PlayerRoom() {
         }
         break;
 
-      case 'GAME_OVER':
+      case 'GAME_OVER': {
         setPhase('FINISHED');
         sound.playFanfare();
-        if (playerId) {
-          const podium = msg.finalPodium || [];
-          const myInfo = podium.find((p: any) => p.id === playerId);
-          if (myInfo) {
-            setFinalRank({
-              rank: myInfo.rank || 1,
-              score: myInfo.score || 0,
-              totalPlayers: podium.length
-            });
-            if (myInfo.rank <= 3) {
-              confetti({ particleCount: 100, spread: 70 });
-            }
+        const podium = msg.finalPodium || [];
+        setFinalPodium(podium);
+        setPostGameAwards(msg.awards || []);
+        const myInfo = playerId ? podium.find((p: any) => p.id === playerId) : podium[0];
+        if (myInfo) {
+          setFinalRank({
+            rank: myInfo.rank || 1,
+            score: myInfo.score || 0,
+            totalPlayers: podium.length
+          });
+          if (myInfo.rank <= 3) {
+            confetti({ particleCount: 100, spread: 70 });
           }
+        } else {
+          setFinalRank({
+            rank: 1,
+            score: resultData?.totalScore || 0,
+            totalPlayers: Math.max(1, podium.length)
+          });
         }
         break;
+      }
 
       case 'GAME_RESET':
         setPhase('LOBBY');
         setSelectedOption(null);
         setResultData(null);
+        setFinalPodium([]);
+        setPostGameAwards([]);
         setBombHolderId(null);
         setExplodedPlayerId(null);
         setFiftyFiftyLeft(true);
@@ -1149,39 +1161,133 @@ export default function PlayerRoom() {
 
   // 7. Finished / Game Over Phase
   if (phase === 'FINISHED' && finalRank) {
+    const mySummary = finalPodium.find((p) => p.id === playerId);
+    const myAwards = postGameAwards.filter((aw) => aw.playerId === playerId);
+
     return (
       <>
         {renderFloatingReactions()}
-        <div className="max-w-md mx-auto py-12 px-4 pb-24 text-center">
-          <div className="arcade-card p-8 bg-[#151c2c]">
-            <Award className="w-16 h-16 text-amber-400 mx-auto mb-3" />
-            <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-black text-white">Permainan Selesai!</h2>
-            <p className="text-slate-400 text-xs mt-1 mb-6 font-medium">Seluruh pertanyaan kuis telah selesai dijawab.</p>
+        <div className="max-w-4xl mx-auto py-8 px-4 pb-24 text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold bg-amber-400 text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000]">
+              🏆 CHAMPIONSHIP PODIUM
+            </span>
+            {renderAudioControls()}
+          </div>
+          <h2 className="font-['Space_Grotesk',sans-serif] text-3xl font-black text-white mb-2">Permainan Selesai!</h2>
+          <p className="text-slate-400 text-xs sm:text-sm mb-6 font-medium">
+            Lihat posisi karakter 3D di panggung juara dan statistik akhir permainanmu.
+          </p>
 
-            <div className="p-6 bg-[#0b0f19] rounded-xl border-2 border-black mb-6">
+          {/* Interactive 3D Podium Stage */}
+          {finalPodium.length > 0 && (
+            <PodiumArena3D podium={finalPodium} worldTheme={worldTheme} />
+          )}
+
+          {/* Player Personal Performance Report Card */}
+          <div className="arcade-card p-6 sm:p-8 bg-[#151c2c] max-w-xl mx-auto mb-8">
+            <Award className="w-14 h-14 text-amber-400 mx-auto mb-2" />
+            <div className="p-5 bg-[#0b0f19] rounded-xl border-2 border-black mb-5">
               <span className="text-xs uppercase font-mono text-slate-400 font-bold">Peringkat Akhirmu</span>
-              <p className="text-5xl font-black text-amber-400 my-2 font-mono">
+              <p className="text-5xl font-black text-amber-400 my-1.5 font-mono">
                 #{finalRank.rank}
               </p>
               <p className="text-xs text-slate-400 font-mono">
                 dari total {finalRank.totalPlayers} peserta
               </p>
-              <div className="mt-4 pt-4 border-t-2 border-black">
-                <span className="text-xs font-mono text-slate-400">Total Skor Akhir</span>
-                <p className="text-2xl font-mono font-black text-amber-400">{finalRank.score} pts</p>
+
+              <div className="mt-4 pt-4 border-t-2 border-black grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <span className="text-[11px] font-mono text-slate-400 block">Total Skor</span>
+                  <span className="text-lg sm:text-xl font-mono font-black text-amber-400">{finalRank.score}</span>
+                </div>
+                <div>
+                  <span className="text-[11px] font-mono text-slate-400 block">Akurasi</span>
+                  <span className="text-lg sm:text-xl font-mono font-black text-emerald-400">
+                    {mySummary ? `${mySummary.correctCount ?? 0}/${mySummary.totalQuestions ?? 5}` : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] font-mono text-slate-400 block">Max Streak</span>
+                  <span className="text-lg sm:text-xl font-mono font-black text-white">
+                    🔥 {mySummary ? (mySummary.maxStreak ?? mySummary.streak ?? 0) : 0}x
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Personal Earned Badges */}
+            {myAwards.length > 0 && (
+              <div className="mb-6 text-left">
+                <span className="block text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-2 text-center">
+                  🎖️ Gelar Spesial yang Kamu Raih:
+                </span>
+                <div className="grid gap-2">
+                  {myAwards.map((aw) => (
+                    <div
+                      key={aw.id}
+                      className="bg-[#0b0f19] border-2 border-amber-400 rounded-xl p-3 flex items-center justify-between gap-3 shadow-[2px_2px_0px_#000]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl">{aw.icon}</span>
+                        <div>
+                          <p className="font-bold text-white text-xs sm:text-sm">{aw.title}</p>
+                          <p className="text-[11px] text-slate-400">{aw.description}</p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded border border-black shrink-0">
+                        {aw.statLabel}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => {
                 setPhase('JOIN');
                 setPin('');
               }}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3.5 px-4 rounded-xl arcade-btn"
+              className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3.5 px-4 rounded-xl arcade-btn cursor-pointer"
             >
               Main Lagi di Room Baru
             </button>
           </div>
+
+          {/* All Post-Game Special Awards */}
+          {postGameAwards.length > 0 && (
+            <div className="text-left">
+              <h4 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-3 text-center">
+                🌟 Daftar Penerima Penghargaan Unik Arena:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {postGameAwards.map((aw) => (
+                  <div
+                    key={aw.id}
+                    className="iso-card bg-[#151c2c] p-4 rounded-xl border-2 border-black flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-2xl p-2 bg-[#0b0f19] border border-black rounded-lg shrink-0">
+                        {aw.icon}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-['Space_Grotesk'] font-black text-white text-xs sm:text-sm truncate">
+                          {aw.title}
+                        </p>
+                        <p className="text-xs text-amber-400 font-bold truncate">
+                          {aw.playerAvatar} {aw.playerName}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono font-black bg-[#0b0f19] text-emerald-400 px-2.5 py-1 rounded border border-black shrink-0">
+                      {aw.statLabel}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         {renderReactionDock()}
       </>

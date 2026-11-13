@@ -192,13 +192,23 @@ function broadcastQuizListUpdate() {
 
 function getPlayerList(room) {
   const list = [];
+  const totalQ = room.quiz && Array.isArray(room.quiz.questions) ? room.quiz.questions.length : 5;
   for (const p of room.players.values()) {
+    const avgAnswerTimeMs = p.answeredQuestionsCount > 0
+      ? Math.round(p.totalAnswerTimeMs / p.answeredQuestionsCount)
+      : 0;
     list.push({
       id: p.id,
       name: p.name,
       avatar: p.avatar,
       score: p.score,
       streak: p.streak,
+      maxStreak: p.maxStreak || p.streak || 0,
+      correctCount: p.correctCount || 0,
+      avgAnswerTimeMs,
+      bombPasses: p.bombPasses || 0,
+      survivedRounds: p.survivedRounds || 0,
+      totalQuestions: totalQ,
       answeredCurrent: p.currentAnswer !== null,
       x: typeof p.x === 'number' ? p.x : 0,
       z: typeof p.z === 'number' ? p.z : 0,
@@ -208,6 +218,102 @@ function getPlayerList(room) {
   }
   list.sort((a, b) => b.score - a.score);
   return list.map((p, idx) => ({ ...p, rank: idx + 1 }));
+}
+
+function computePostGameAwards(room, leaderboard) {
+  if (!Array.isArray(leaderboard) || leaderboard.length === 0) return [];
+  const awards = [];
+  const totalQ = room.quiz && Array.isArray(room.quiz.questions) ? room.quiz.questions.length : 5;
+
+  // 1. Si Kilat (Fastest Responder among players with at least 1 correct answer, or lowest avg time)
+  const withTime = leaderboard.filter(p => (p.avgAnswerTimeMs || 0) > 0 && (p.correctCount || 0) > 0);
+  const fastestPool = withTime.length > 0 ? withTime : leaderboard.filter(p => (p.avgAnswerTimeMs || 0) > 0);
+  if (fastestPool.length > 0) {
+    const fastest = [...fastestPool].sort((a, b) => a.avgAnswerTimeMs - b.avgAnswerTimeMs)[0];
+    const secStr = (fastest.avgAnswerTimeMs / 1000).toFixed(1) + ' detik';
+    awards.push({
+      id: 'speedster',
+      title: 'Si Kilat Arena',
+      icon: '⚡',
+      playerId: fastest.id,
+      playerName: fastest.name,
+      playerAvatar: fastest.avatar,
+      statLabel: `Rata-rata ${secStr}`,
+      description: 'Refleks tercepat dalam mengunci petak jawaban!'
+    });
+  } else {
+    const top = leaderboard[0];
+    awards.push({
+      id: 'speedster',
+      title: 'Si Kilat Arena',
+      icon: '⚡',
+      playerId: top.id,
+      playerName: top.name,
+      playerAvatar: top.avatar,
+      statLabel: `${top.score} pts`,
+      description: 'Penguasa kecepatan dan ketepatan di arena!'
+    });
+  }
+
+  // 2. Unstoppable Streak (Highest maxStreak)
+  const streakSorted = [...leaderboard].sort((a, b) => (b.maxStreak || 0) - (a.maxStreak || 0) || b.score - a.score);
+  const topStrept = streakSorted[0];
+  awards.push({
+    id: 'streak_king',
+    title: 'Unstoppable Streak',
+    icon: '🔥',
+    playerId: topStrept.id,
+    playerName: topStrept.name,
+    playerAvatar: topStrept.avatar,
+    statLabel: `${topStrept.maxStreak || 0}x Beruntun`,
+    description: 'Rekor kombo jawaban benar berturut-turut terpanjang!'
+  });
+
+  // 3. Sniper Akurat (Highest Accuracy %)
+  const accSorted = [...leaderboard].sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0) || b.score - a.score);
+  const topAcc = accSorted[0];
+  const accPct = totalQ > 0 ? Math.round(((topAcc.correctCount || 0) / totalQ) * 100) : 100;
+  awards.push({
+    id: 'sniper',
+    title: 'Sniper Akurat',
+    icon: '🎯',
+    playerId: topAcc.id,
+    playerName: topAcc.name,
+    playerAvatar: topAcc.avatar,
+    statLabel: `${topAcc.correctCount || 0}/${totalQ} Benar (${accPct}%)`,
+    description: 'Ketepatan memilih petak jawaban paling presisi!'
+  });
+
+  // 4. Penjinak Bom Terbaik (in bomb_tag) or Survivor Tangguh
+  if (room.gameMode === 'bomb_tag') {
+    const bombSorted = [...leaderboard].sort((a, b) => (b.bombPasses || 0) - (a.bombPasses || 0) || (b.survivedRounds || 0) - (a.survivedRounds || 0));
+    const topBomb = bombSorted[0];
+    awards.push({
+      id: 'bomb_master',
+      title: 'Penjinak Bom Terbaik',
+      icon: '💣',
+      playerId: topBomb.id,
+      playerName: topBomb.name,
+      playerAvatar: topBomb.avatar,
+      statLabel: topBomb.bombPasses > 0 ? `${topBomb.bombPasses}x Oper Bom` : `${topBomb.survivedRounds || 0} Ronde Selamat`,
+      description: 'Paling lincah mengoper bom dan selamat dari ledakan!'
+    });
+  } else {
+    const survSorted = [...leaderboard].sort((a, b) => (b.survivedRounds || 0) - (a.survivedRounds || 0) || b.score - a.score);
+    const topSurv = survSorted[0];
+    awards.push({
+      id: 'survivor',
+      title: 'Survivor Tangguh',
+      icon: '🛡️',
+      playerId: topSurv.id,
+      playerName: topSurv.name,
+      playerAvatar: topSurv.avatar,
+      statLabel: `${topSurv.survivedRounds || 0}/${totalQ} Ronde Selamat`,
+      description: 'Bertahan paling kokoh tanpa jatuh dari arena 3D!'
+    });
+  }
+
+  return awards;
 }
 
 function broadcastPlayersPositions(room) {
@@ -243,6 +349,7 @@ function passBombToNext(room, fromPlayer, reason) {
 
   room.bombHolderId = targetId;
   room.lastBombPassTime = Date.now();
+  fromPlayer.bombPasses = (fromPlayer.bombPasses || 0) + 1;
 
   broadcastToRoom(room, {
     type: 'BOMB_PASSED',
@@ -271,6 +378,11 @@ function endCurrentQuestion(room) {
     const isBombHolder = isBombTag && player.id === room.bombHolderId;
     let earned = 0;
 
+    if (player.answerTimeMs !== null && typeof player.answerTimeMs === 'number') {
+      player.totalAnswerTimeMs = (player.totalAnswerTimeMs || 0) + Math.max(100, player.answerTimeMs);
+      player.answeredQuestionsCount = (player.answeredQuestionsCount || 0) + 1;
+    }
+
     if (isBombHolder) {
       // KABOOM! Pemegang bom saat waktu habis meledak!
       earned = 0;
@@ -278,6 +390,9 @@ function endCurrentQuestion(room) {
       player.lastExploded = true;
     } else if (isCorrect) {
       player.streak = (player.streak || 0) + 1;
+      player.maxStreak = Math.max(player.maxStreak || 0, player.streak);
+      player.correctCount = (player.correctCount || 0) + 1;
+      player.survivedRounds = (player.survivedRounds || 0) + 1;
       const timeLimitMs = (q.timeLimit || 15) * 1000;
       const timeSpent = Math.min(player.answerTimeMs || timeLimitMs, timeLimitMs);
       const speedRatio = Math.max(0, 1 - (timeSpent / timeLimitMs));
@@ -296,6 +411,9 @@ function endCurrentQuestion(room) {
     } else {
       player.streak = 0;
       player.lastExploded = false;
+      if (isBombTag) {
+        player.survivedRounds = (player.survivedRounds || 0) + 1;
+      }
     }
 
     if (player.currentAnswer !== null && player.currentAnswer >= 0 && player.currentAnswer < 4) {
@@ -523,6 +641,12 @@ wss.on('connection', (ws) => {
             ws,
             score: 0,
             streak: 0,
+            maxStreak: 0,
+            correctCount: 0,
+            totalAnswerTimeMs: 0,
+            answeredQuestionsCount: 0,
+            bombPasses: 0,
+            survivedRounds: 0,
             currentAnswer: null,
             answerTimeMs: null,
             lastReactionTime: 0,
@@ -779,6 +903,7 @@ wss.on('connection', (ws) => {
                   if (distToBot < 2.0) {
                     room.bombHolderId = 'bot_target';
                     room.lastBombPassTime = now;
+                    player.bombPasses = (player.bombPasses || 0) + 1;
                     broadcastToRoom(room, {
                       type: 'BOMB_PASSED',
                       bombHolderId: 'bot_target',
@@ -825,9 +950,11 @@ wss.on('connection', (ws) => {
           } else {
             room.phase = 'FINISHED';
             const finalLeaderboard = getPlayerList(room);
+            const awards = computePostGameAwards(room, finalLeaderboard);
             broadcastToRoom(room, {
               type: 'GAME_OVER',
-              finalPodium: finalLeaderboard
+              finalPodium: finalLeaderboard,
+              awards
             });
           }
           break;
@@ -841,6 +968,12 @@ wss.on('connection', (ws) => {
           for (const p of room.players.values()) {
             p.score = 0;
             p.streak = 0;
+            p.maxStreak = 0;
+            p.correctCount = 0;
+            p.totalAnswerTimeMs = 0;
+            p.answeredQuestionsCount = 0;
+            p.bombPasses = 0;
+            p.survivedRounds = 0;
             p.currentAnswer = null;
             p.answerTimeMs = null;
             if (room.gameMode === 'glass_bridge') {

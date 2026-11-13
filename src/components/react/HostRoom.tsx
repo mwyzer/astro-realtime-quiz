@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode, WorldTheme } from '../../types/quiz';
+import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode, WorldTheme, PostGameAward } from '../../types/quiz';
 import { DEFAULT_QUIZZES } from '../../data/default-quizzes';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D from './RobloxArena3D';
+import PodiumArena3D from './PodiumArena3D';
 import { 
   Users, Play, ArrowRight, Trophy, RotateCcw, 
   Copy, Check, Clock, Volume2, VolumeX, ShieldAlert,
@@ -61,6 +62,7 @@ export default function HostRoom() {
   const [timeLeft, setTimeLeft] = useState(15);
   const [answerStats, setAnswerStats] = useState<AnswerStats | null>(null);
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
+  const [postGameAwards, setPostGameAwards] = useState<PostGameAward[]>([]);
   const [copied, setCopied] = useState(false);
   const [audioState, setAudioState] = useState(() => sound.getState());
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
@@ -281,6 +283,7 @@ export default function HostRoom() {
       case 'GAME_OVER':
         setPhase('FINISHED');
         setFinalPodium(msg.finalPodium || []);
+        setPostGameAwards(msg.awards || []);
         confetti({
           particleCount: 120,
           spread: 80,
@@ -293,6 +296,7 @@ export default function HostRoom() {
         setPhase('LOBBY');
         setPlayers(msg.players || []);
         setAnswerStats(null);
+        setPostGameAwards([]);
         setCurrentQuestion(null);
         setBombHolderId(null);
         setExplodedPlayerId(null);
@@ -1217,22 +1221,35 @@ export default function HostRoom() {
       <>
         {renderFloatingReactions()}
         {renderPowerupToast()}
-        <div className="max-w-4xl mx-auto py-8 px-4 pb-24 text-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold bg-amber-400 text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000] mb-3">
-            GAME OVER
-          </span>
-          <h2 className="font-['Space_Grotesk',sans-serif] text-4xl font-black text-white mb-2">Papan Skor Juara</h2>
-          <p className="text-slate-400 text-sm mb-12 font-medium">Selamat kepada seluruh peserta dan juara kuis!</p>
+        <div className="max-w-5xl mx-auto py-8 px-4 pb-24 text-center">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-bold bg-amber-400 text-slate-950 border-2 border-black shadow-[2px_2px_0px_#000]">
+              🏆 CHAMPIONSHIP PODIUM
+            </span>
+            {renderAudioControls()}
+          </div>
+          <h2 className="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white mb-2">
+            Panggung Juara & Penghargaan Spesial
+          </h2>
+          <p className="text-slate-400 text-sm mb-6 font-medium">
+            Selamat kepada seluruh juara dan penerima gelar kehormatan arena!
+          </p>
+
+          {/* Interactive 3D Podium Stage */}
+          <PodiumArena3D podium={finalPodium} worldTheme={worldTheme} />
 
           {/* Podium Graphic Neo-Brutalist */}
-          <div className="flex items-end justify-center gap-4 mb-12 max-w-lg mx-auto">
+          <div className="flex items-end justify-center gap-3 sm:gap-4 mb-10 max-w-xl mx-auto">
             {/* 2nd Place */}
             {top3[1] && (
               <div className="flex-1 flex flex-col items-center">
-                <span className="text-4xl mb-2">{top3[1].avatar}</span>
-                <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[1].name}</p>
-                <p className="text-xs text-slate-400 mb-2 font-mono">{top3[1].score} pts</p>
-                <div className="w-full h-32 bg-[#1e293b] border-2 border-black rounded-t-xl flex items-center justify-center text-3xl font-black text-slate-300 shadow-[4px_4px_0px_#000]">
+                <span className="text-4xl mb-1">{top3[1].avatar}</span>
+                <p className="font-bold text-white text-sm truncate max-w-[110px]">{top3[1].name}</p>
+                <p className="text-xs text-slate-300 font-mono font-bold">{top3[1].score} pts</p>
+                <span className="text-[10px] font-mono text-slate-400 mb-2">
+                  🎯 {top3[1].correctCount ?? 0}/{top3[1].totalQuestions ?? quizMeta.count} • 🔥 {top3[1].maxStreak ?? top3[1].streak}x
+                </span>
+                <div className="w-full h-28 sm:h-32 bg-[#1e293b] border-2 border-black rounded-t-xl flex items-center justify-center text-3xl font-black text-slate-300 shadow-[4px_4px_0px_#000]">
                   2
                 </div>
               </div>
@@ -1241,10 +1258,13 @@ export default function HostRoom() {
             {/* 1st Place */}
             {top3[0] && (
               <div className="flex-1 flex flex-col items-center">
-                <span className="text-5xl mb-2">👑 {top3[0].avatar}</span>
-                <p className="font-black text-amber-400 text-base truncate max-w-[120px]">{top3[0].name}</p>
-                <p className="text-xs text-amber-300 font-bold mb-2 font-mono">{top3[0].score} pts</p>
-                <div className="w-full h-44 bg-amber-400 border-2 border-black rounded-t-xl flex items-center justify-center text-5xl font-black text-slate-950 shadow-[6px_6px_0px_#000]">
+                <span className="text-5xl mb-1">👑 {top3[0].avatar}</span>
+                <p className="font-black text-amber-400 text-base truncate max-w-[130px]">{top3[0].name}</p>
+                <p className="text-xs text-amber-300 font-bold font-mono">{top3[0].score} pts</p>
+                <span className="text-[10px] font-mono text-amber-200/90 mb-2">
+                  🎯 {top3[0].correctCount ?? 0}/{top3[0].totalQuestions ?? quizMeta.count} • 🔥 {top3[0].maxStreak ?? top3[0].streak}x
+                </span>
+                <div className="w-full h-40 sm:h-44 bg-amber-400 border-2 border-black rounded-t-xl flex items-center justify-center text-5xl font-black text-slate-950 shadow-[6px_6px_0px_#000]">
                   1
                 </div>
               </div>
@@ -1253,27 +1273,77 @@ export default function HostRoom() {
             {/* 3rd Place */}
             {top3[2] && (
               <div className="flex-1 flex flex-col items-center">
-                <span className="text-4xl mb-2">{top3[2].avatar}</span>
-                <p className="font-bold text-white text-sm truncate max-w-[100px]">{top3[2].name}</p>
-                <p className="text-xs text-slate-400 mb-2 font-mono">{top3[2].score} pts</p>
-                <div className="w-full h-24 bg-[#151c2c] border-2 border-black rounded-t-xl flex items-center justify-center text-2xl font-black text-amber-400 shadow-[4px_4px_0px_#000]">
+                <span className="text-4xl mb-1">{top3[2].avatar}</span>
+                <p className="font-bold text-white text-sm truncate max-w-[110px]">{top3[2].name}</p>
+                <p className="text-xs text-slate-300 font-mono font-bold">{top3[2].score} pts</p>
+                <span className="text-[10px] font-mono text-slate-400 mb-2">
+                  🎯 {top3[2].correctCount ?? 0}/{top3[2].totalQuestions ?? quizMeta.count} • 🔥 {top3[2].maxStreak ?? top3[2].streak}x
+                </span>
+                <div className="w-full h-22 sm:h-24 bg-[#151c2c] border-2 border-black rounded-t-xl flex items-center justify-center text-2xl font-black text-amber-400 shadow-[4px_4px_0px_#000]">
                   3
                 </div>
               </div>
             )}
           </div>
 
+          {/* Hall of Fame: Post-Game Special Awards */}
+          {postGameAwards.length > 0 && (
+            <div className="mb-10 text-left">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <span className="font-mono text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg bg-[#151c2c] text-amber-400 border-2 border-black shadow-[2px_2px_0px_#000]">
+                  🌟 Penghargaan Unik Arena (Post-Game Awards)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {postGameAwards.map((aw) => (
+                  <div
+                    key={aw.id}
+                    className="iso-card bg-[#151c2c] p-4 rounded-xl border-2 border-black flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-2xl p-1.5 rounded-lg bg-[#0b0f19] border border-black">
+                          {aw.icon}
+                        </span>
+                        <span className="text-[11px] font-mono font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded border border-black">
+                          {aw.statLabel}
+                        </span>
+                      </div>
+                      <h4 className="font-['Space_Grotesk'] font-black text-white text-sm mb-1">
+                        {aw.title}
+                      </h4>
+                      <p className="text-xs text-slate-400 leading-snug mb-3">
+                        {aw.description}
+                      </p>
+                    </div>
+                    <div className="bg-[#0b0f19] border-2 border-black rounded-lg px-3 py-2 flex items-center gap-2">
+                      <span className="text-xl">{aw.playerAvatar}</span>
+                      <span className="font-bold text-white text-xs truncate">{aw.playerName}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rest of Leaderboard */}
           {rest.length > 0 && (
-            <div className="arcade-card p-4 max-w-md mx-auto mb-8 text-left bg-[#151c2c]">
-              <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Peringkat Lainnya:</h4>
+            <div className="arcade-card p-5 max-w-2xl mx-auto mb-8 text-left bg-[#151c2c]">
+              <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">
+                Klasemen Lengkap Peserta Lainnya:
+              </h4>
               <div className="space-y-2">
                 {rest.map((p, idx) => (
                   <div key={p.id} className="flex items-center justify-between p-2.5 bg-[#0b0f19] border border-black rounded-lg text-sm">
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-slate-400 font-bold w-6">#{idx + 4}</span>
                       <span className="text-lg">{p.avatar}</span>
-                      <span className="font-bold text-white">{p.name}</span>
+                      <div>
+                        <span className="font-bold text-white block">{p.name}</span>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          Benar: {p.correctCount ?? 0}/{p.totalQuestions ?? quizMeta.count} • Max Streak: {p.maxStreak ?? p.streak}x
+                        </span>
+                      </div>
                     </div>
                     <span className="font-mono font-bold text-amber-400">{p.score} pts</span>
                   </div>

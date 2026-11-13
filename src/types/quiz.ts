@@ -28,6 +28,12 @@ export interface PlayerSummary {
   avatar: string;
   score: number;
   streak: number;
+  maxStreak?: number;
+  correctCount?: number;
+  avgAnswerTimeMs?: number;
+  bombPasses?: number;
+  survivedRounds?: number;
+  totalQuestions?: number;
   rank?: number;
   answeredCurrent?: boolean;
   x?: number;
@@ -35,6 +41,17 @@ export interface PlayerSummary {
   jumping?: boolean;
   currentAnswer?: number | null;
   exploded?: boolean;
+}
+
+export interface PostGameAward {
+  id: string;
+  title: string;
+  icon: string;
+  playerId: string;
+  playerName: string;
+  playerAvatar: string;
+  statLabel: string;
+  description: string;
 }
 
 export interface AnswerStats {
