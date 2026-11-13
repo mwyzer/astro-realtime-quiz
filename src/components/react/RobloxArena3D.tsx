@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { WorldTheme } from '../../types/quiz';
+import { sound } from './SoundPlayer';
 
 export interface Player3DData {
   id: string;
@@ -91,6 +92,15 @@ export default function RobloxArena3D({
   const isIsometricRef = useRef(!!isHost);
   isIsometricRef.current = isIsometric;
 
+  const [audioState, setAudioState] = useState(() => sound.getState());
+  useEffect(() => {
+    return sound.subscribe((st) => setAudioState(st));
+  }, []);
+
+  useEffect(() => {
+    sound.setTheme(worldTheme);
+  }, [worldTheme]);
+
   // Third-person follow camera & player facing yaw refs
   const camYawRef = useRef(0);
   const playerFacingYawRef = useRef(Math.PI);
@@ -134,6 +144,7 @@ export default function RobloxArena3D({
       localPosRef.current.vy = 0.25; // small hop
       localPosRef.current.jumping = true;
       setCurrentStandingZone(zoneIdx);
+      sound.playTileSelect(zoneIdx);
       if (onSelectZone) onSelectZone(zoneIdx);
       if (onMove) onMove(localPosRef.current.x, localPosRef.current.z, true, zoneIdx);
     }
@@ -143,6 +154,7 @@ export default function RobloxArena3D({
     if (localPosRef.current.y <= 0.55) {
       localPosRef.current.vy = 0.28;
       localPosRef.current.jumping = true;
+      sound.playJump();
     }
   };
 
@@ -1455,8 +1467,11 @@ export default function RobloxArena3D({
       if (detectedZone !== lastZoneDetected) {
         lastZoneDetected = detectedZone;
         setCurrentStandingZone(detectedZone);
-        if (detectedZone !== null && onSelectZone && phaseRef.current === 'QUESTION') {
-          onSelectZone(detectedZone);
+        if (detectedZone !== null) {
+          sound.playTileSelect(detectedZone);
+          if (onSelectZone && phaseRef.current === 'QUESTION') {
+            onSelectZone(detectedZone);
+          }
         }
       }
 
@@ -1872,6 +1887,34 @@ export default function RobloxArena3D({
         >
           <span>{isIsometric ? '📐 PoV: Isometrik' : '🎥 PoV: 3rd-Person Roblox'}</span>
         </button>
+
+        {/* Retro Arcade SFX & Procedural Chiptune BGM Toggles */}
+        <div className="bg-[#0b0f19] border-2 border-black p-0.5 rounded-xl shadow-[2px_2px_0px_#000] flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => sound.toggleSfx()}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold cursor-pointer transition-all flex items-center gap-1 ${
+              audioState.sfxEnabled
+                ? 'bg-emerald-500 text-slate-950 border border-black'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Aktifkan / Matikan Efek Suara 8-Bit (SFX)"
+          >
+            <span>{audioState.sfxEnabled ? '🔊 SFX' : '🔇 SFX'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => sound.toggleBgm()}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold cursor-pointer transition-all flex items-center gap-1 ${
+              audioState.bgmEnabled
+                ? 'bg-amber-400 text-slate-950 border border-black'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Aktifkan / Matikan Musik Latar Chiptune Sesuai Tema Dunia (BGM)"
+          >
+            <span>{audioState.bgmEnabled ? '🎵 BGM ON' : '🎵 BGM'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Top HUD Overlay (Question info & timer inside 3D Canvas, positioned below top controls so it never overlaps or hides on mobile) */}

@@ -62,9 +62,21 @@ export default function HostRoom() {
   const [answerStats, setAnswerStats] = useState<AnswerStats | null>(null);
   const [finalPodium, setFinalPodium] = useState<PlayerSummary[]>([]);
   const [copied, setCopied] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [audioState, setAudioState] = useState(() => sound.getState());
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
   const [worldTheme, setWorldTheme] = useState<WorldTheme>('arcade');
+
+  useEffect(() => {
+    return sound.subscribe((st) => setAudioState(st));
+  }, []);
+
+  useEffect(() => {
+    sound.setTheme(worldTheme);
+  }, [worldTheme]);
+
+  useEffect(() => {
+    sound.setUrgentMode(phase === 'QUESTION' && timeLeft <= 5 && timeLeft > 0);
+  }, [phase, timeLeft]);
   const [bombHolderId, setBombHolderId] = useState<string | null>(null);
   const [explodedPlayerId, setExplodedPlayerId] = useState<string | null>(null);
   const [bombToast, setBombToast] = useState<{ text: string; id: number } | null>(null);
@@ -225,6 +237,7 @@ export default function HostRoom() {
           totalQuestions: msg.totalQuestions,
         });
         setTimeLeft(msg.question.timeLimit || 15);
+        sound.playQuestionStart();
         break;
 
       case 'BOMB_PASSED': {
@@ -238,7 +251,7 @@ export default function HostRoom() {
           text: `Estafet Bom: ${msg.fromName} ke ${msg.toName} (${reasonDesc})`,
           id: Date.now()
         });
-        sound.playPop();
+        sound.playBombPass();
         setTimeout(() => setBombToast(null), 3500);
         break;
       }
@@ -246,7 +259,7 @@ export default function HostRoom() {
       case 'TIME_TICK':
         setTimeLeft(msg.timeLeft);
         if (msg.timeLeft <= 5 && msg.timeLeft > 0) {
-          sound.playCountdownTick();
+          sound.playCountdownTick(msg.timeLeft <= 3);
         }
         break;
 
@@ -255,7 +268,14 @@ export default function HostRoom() {
         setAnswerStats(msg.stats);
         if (msg.explodedPlayerId) setExplodedPlayerId(msg.explodedPlayerId);
         if (msg.leaderboard) setPlayers(msg.leaderboard);
-        sound.playCorrect();
+        if (msg.explodedPlayerId) {
+          sound.playExplosion();
+        } else if (gameMode === 'glass_bridge') {
+          sound.playGlassShatter();
+          setTimeout(() => sound.playCorrect(), 240);
+        } else {
+          sound.playCorrect();
+        }
         break;
 
       case 'GAME_OVER':
@@ -266,7 +286,7 @@ export default function HostRoom() {
           spread: 80,
           origin: { y: 0.6 }
         });
-        sound.playCorrect();
+        sound.playFanfare();
         break;
 
       case 'GAME_RESET':
@@ -300,10 +320,10 @@ export default function HostRoom() {
           text: `${msg.playerAvatar} ${msg.playerName} aktifkan ${msg.powerupName}!`,
           id: Date.now()
         });
-        sound.playPop();
+        sound.playPowerup();
         setTimeout(() => {
-          setPowerupToast(null), 3500;
-        });
+          setPowerupToast(null);
+        }, 3500);
         break;
       }
 
@@ -325,6 +345,7 @@ export default function HostRoom() {
 
   const changeGameMode = (newMode: GameMode) => {
     setGameMode(newMode);
+    sound.playPop();
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
       wsRef.current.send(JSON.stringify({ type: 'SET_GAME_MODE', gameMode: newMode }));
     }
@@ -332,10 +353,43 @@ export default function HostRoom() {
 
   const changeWorldTheme = (newTheme: WorldTheme) => {
     setWorldTheme(newTheme);
+    sound.setTheme(newTheme);
+    sound.playPop();
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
       wsRef.current.send(JSON.stringify({ type: 'SET_WORLD_THEME', worldTheme: newTheme }));
     }
   };
+
+  const renderAudioControls = () => (
+    <div className="inline-flex items-center gap-1.5 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+      <button
+        type="button"
+        onClick={() => sound.toggleSfx()}
+        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+          audioState.sfxEnabled
+            ? 'bg-emerald-500 text-slate-950 border-black shadow-[1px_1px_0px_#000]'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
+        }`}
+        title={audioState.sfxEnabled ? 'Matikan Efek Suara (SFX)' : 'Nyalakan Efek Suara (SFX)'}
+      >
+        {audioState.sfxEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+        <span>{audioState.sfxEnabled ? 'SFX ON' : 'SFX OFF'}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => sound.toggleBgm()}
+        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+          audioState.bgmEnabled
+            ? 'bg-amber-400 text-slate-950 border-black shadow-[1px_1px_0px_#000]'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
+        }`}
+        title={audioState.bgmEnabled ? 'Matikan Musik Latar Tema (BGM)' : 'Nyalakan Musik Latar Tema (BGM)'}
+      >
+        <span>🎵</span>
+        <span>{audioState.bgmEnabled ? 'BGM ON' : 'BGM OFF'}</span>
+      </button>
+    </div>
+  );
 
   const renderWorldThemeSelector = (compact = false) => {
     const themes: { id: WorldTheme; label: string; icon: string; desc: string; tag: string }[] = [
@@ -631,13 +685,14 @@ export default function HostRoom() {
     return (
       <div className="max-w-5xl mx-auto py-8 px-4">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold border-2 border-black shadow-[2px_2px_0px_#000] ${
               wsConnected ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'
             }`}>
               <Radio className="w-3.5 h-3.5" />
               {wsConnected ? 'Server Online' : 'Menghubungkan Server...'}
             </span>
+            {renderAudioControls()}
           </div>
           <h1 className="font-['Space_Grotesk',sans-serif] text-3xl sm:text-4xl font-black text-white">Pilih Paket Kuis</h1>
           <p className="text-slate-400 text-sm mt-2 font-medium">Pilih mode arena 3D dan salah satu paket soal di bawah untuk membuka room kuis baru.</p>
@@ -736,14 +791,7 @@ export default function HostRoom() {
               <div className="flex flex-wrap items-center gap-2">
                 {renderModeSelector(true)}
                 {renderWorldThemeSelector(true)}
-                <button 
-                  type="button"
-                  onClick={() => setSoundEnabled(!soundEnabled)}
-                  className="p-2 bg-[#1e293b] hover:bg-slate-700 text-slate-200 rounded-lg border-2 border-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
-                  title={soundEnabled ? 'Matikan Suara' : 'Nyalakan Suara'}
-                >
-                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                </button>
+                {renderAudioControls()}
               </div>
             </div>
 

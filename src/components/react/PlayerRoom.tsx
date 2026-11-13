@@ -5,7 +5,8 @@ import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
 import { 
   Gamepad2, CheckCircle2, XCircle, Clock, 
-  Flame, Award, AlertCircle, Sparkles, Send, Radio 
+  Flame, Award, AlertCircle, Sparkles, Send, Radio,
+  Volume2, VolumeX
 } from 'lucide-react';
 
 const AVATARS = ['🦊', '🐯', '🚀', '🐼', '👾', '🦄', '⚡', '🥑', '🦁', '🦉'];
@@ -47,10 +48,23 @@ export default function PlayerRoom() {
   // Game Mode & 3D Arena Players
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
   const [worldTheme, setWorldTheme] = useState<WorldTheme>('arcade');
+  const [audioState, setAudioState] = useState(() => sound.getState());
   const [bombHolderId, setBombHolderId] = useState<string | null>(null);
   const [explodedPlayerId, setExplodedPlayerId] = useState<string | null>(null);
   const [bombToast, setBombToast] = useState<{ text: string; id: number } | null>(null);
   const [arenaPlayers, setArenaPlayers] = useState<Player3DData[]>([]);
+
+  useEffect(() => {
+    return sound.subscribe((st) => setAudioState(st));
+  }, []);
+
+  useEffect(() => {
+    sound.setTheme(worldTheme);
+  }, [worldTheme]);
+
+  useEffect(() => {
+    sound.setUrgentMode(phase === 'QUESTION' && timeLeft <= 5 && timeLeft > 0);
+  }, [phase, timeLeft]);
 
   // Power-Up Lifelines
   const [fiftyFiftyLeft, setFiftyFiftyLeft] = useState(true);
@@ -237,7 +251,7 @@ export default function PlayerRoom() {
           totalQuestions: msg.totalQuestions,
         });
         setTimeLeft(msg.question.timeLimit || 15);
-        sound.playPop();
+        sound.playQuestionStart();
         break;
 
       case 'BOMB_PASSED': {
@@ -257,7 +271,7 @@ export default function PlayerRoom() {
             : `Estafet Bom: ${msg.fromName} ke ${msg.toName} (${reasonDesc})`,
           id: Date.now()
         });
-        sound.playPop();
+        sound.playBombPass();
         setTimeout(() => setBombToast(null), 3500);
         break;
       }
@@ -265,13 +279,13 @@ export default function PlayerRoom() {
       case 'FIFTY_FIFTY_RESULT':
         setHiddenOptions(msg.hiddenIndices || []);
         setFiftyFiftyLeft(false);
-        sound.playPop();
+        sound.playPowerup();
         break;
 
       case 'DOUBLE_POINTS_ACTIVE':
         setActiveDouble(true);
         setDoublePointsLeft(false);
-        sound.playPop();
+        sound.playPowerup();
         break;
 
       case 'EMOJI_REACTION': {
@@ -294,7 +308,7 @@ export default function PlayerRoom() {
       case 'TIME_TICK':
         setTimeLeft(msg.timeLeft);
         if (msg.timeLeft <= 5 && msg.timeLeft > 0) {
-          sound.playCountdownTick();
+          sound.playCountdownTick(msg.timeLeft <= 3);
         }
         break;
 
@@ -318,9 +332,11 @@ export default function PlayerRoom() {
           exploded: !!msg.exploded,
         });
         if (msg.exploded) {
-          sound.playIncorrect();
+          sound.playExplosion();
         } else if (msg.isCorrect) {
           sound.playCorrect();
+        } else if (gameMode === 'glass_bridge') {
+          sound.playGlassShatter();
         } else {
           sound.playIncorrect();
         }
@@ -328,6 +344,7 @@ export default function PlayerRoom() {
 
       case 'GAME_OVER':
         setPhase('FINISHED');
+        sound.playFanfare();
         if (playerId) {
           const podium = msg.finalPodium || [];
           const myInfo = podium.find((p: any) => p.id === playerId);
@@ -546,6 +563,37 @@ export default function PlayerRoom() {
     );
   };
 
+  const renderAudioControls = () => (
+    <div className="inline-flex items-center gap-1 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+      <button
+        type="button"
+        onClick={() => sound.toggleSfx()}
+        className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+          audioState.sfxEnabled
+            ? 'bg-emerald-500 text-slate-950 border-black'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
+        }`}
+        title={audioState.sfxEnabled ? 'Matikan Efek Suara (SFX)' : 'Nyalakan Efek Suara (SFX)'}
+      >
+        {audioState.sfxEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+        <span>{audioState.sfxEnabled ? 'SFX' : 'MUTE'}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => sound.toggleBgm()}
+        className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+          audioState.bgmEnabled
+            ? 'bg-amber-400 text-slate-950 border-black'
+            : 'text-slate-400 hover:text-white hover:bg-slate-800 border-transparent'
+        }`}
+        title={audioState.bgmEnabled ? 'Matikan Musik Latar Tema (BGM)' : 'Nyalakan Musik Latar Tema (BGM)'}
+      >
+        <span>🎵</span>
+        <span>{audioState.bgmEnabled ? 'BGM ON' : 'BGM'}</span>
+      </button>
+    </div>
+  );
+
   // 1. Join Room Phase
   if (phase === 'JOIN') {
     return (
@@ -555,7 +603,7 @@ export default function PlayerRoom() {
             <div className="w-14 h-14 bg-amber-400 text-slate-950 rounded-xl flex items-center justify-center mx-auto mb-3 border-2 border-black shadow-[3px_3px_0px_#000]">
               <Gamepad2 className="w-7 h-7" />
             </div>
-            <div className="flex items-center justify-center gap-1.5 mb-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold border ${
                 wsConnected 
                   ? 'bg-emerald-500 text-slate-950 border-black' 
@@ -564,6 +612,7 @@ export default function PlayerRoom() {
                 <Radio className="w-3 h-3" />
                 {wsConnected ? 'Server Online' : 'Connecting...'}
               </span>
+              {renderAudioControls()}
             </div>
             <h2 className="font-['Space_Grotesk',sans-serif] text-2xl font-black text-white">Gabung Permainan</h2>
             <p className="text-slate-400 text-xs mt-1 font-medium">Masukkan PIN 6 digit dari layar Host untuk memulai</p>
