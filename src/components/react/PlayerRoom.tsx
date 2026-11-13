@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GameMode, WorldTheme, PlayerSummary, PostGameAward } from '../../types/quiz';
+import { TEAM_CONFIGS, type GameMode, type WorldTheme, type PlayerSummary, type PostGameAward, type TeamId, type TeamSummary } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
@@ -37,6 +37,9 @@ export default function PlayerRoom() {
   const [pin, setPin] = useState('');
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [teamId, setTeamId] = useState<TeamId>('red');
+  const [teamMode, setTeamMode] = useState(false);
+  const [teamStandings, setTeamStandings] = useState<TeamSummary[]>([]);
 
   // Player state
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -156,6 +159,8 @@ export default function PlayerRoom() {
         setRoomCode(msg.code);
         if (msg.gameMode) setGameMode(msg.gameMode);
         if (msg.worldTheme) setWorldTheme(msg.worldTheme);
+        if (msg.teamId) setTeamId(msg.teamId);
+        if (typeof msg.teamMode === 'boolean') setTeamMode(msg.teamMode);
         if (msg.bombHolderId) setBombHolderId(msg.bombHolderId);
         setPhase('LOBBY');
         setErrorMsg(null);
@@ -163,6 +168,7 @@ export default function PlayerRoom() {
           id: msg.playerId,
           name: name.trim() || 'Pemain',
           avatar,
+          teamId: msg.teamId || teamId,
           x: 0,
           z: msg.gameMode === 'glass_bridge' ? 7.2 : 0,
           jumping: false,
@@ -181,7 +187,14 @@ export default function PlayerRoom() {
         sound.playPop();
         break;
 
+      case 'TEAM_MODE_UPDATED':
+        if (typeof msg.teamMode === 'boolean') setTeamMode(msg.teamMode);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
+        sound.playPop();
+        break;
+
       case 'PLAYER_LIST_UPDATE': {
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         if (msg.players && Array.isArray(msg.players)) {
           setArenaPlayers(prev => {
             const oldMap = new Map(prev.map(p => [p.id, p]));
@@ -191,6 +204,7 @@ export default function PlayerRoom() {
                 id: p.id,
                 name: p.name,
                 avatar: p.avatar,
+                teamId: p.teamId ?? existing?.teamId ?? 'red',
                 x: existing?.x ?? p.x ?? 0,
                 z: existing?.z ?? p.z ?? 0,
                 jumping: existing?.jumping ?? p.jumping ?? false,
@@ -351,6 +365,7 @@ export default function PlayerRoom() {
         const podium = msg.finalPodium || [];
         setFinalPodium(podium);
         setPostGameAwards(msg.awards || []);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         const myInfo = playerId ? podium.find((p: any) => p.id === playerId) : podium[0];
         if (myInfo) {
           setFinalRank({
@@ -405,10 +420,23 @@ export default function PlayerRoom() {
         type: 'JOIN_ROOM',
         code: pin.trim(),
         name: name.trim(),
-        avatar
+        avatar,
+        teamId
       }));
     } else {
       setErrorMsg('Tidak terhubung ke server.');
+    }
+  };
+
+  const changePlayerTeam = (newTeam: TeamId) => {
+    setTeamId(newTeam);
+    sound.playPop();
+    setArenaPlayers(prev => prev.map(p => p.id === playerId ? { ...p, teamId: newTeam } : p));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(JSON.stringify({
+        type: 'CHANGE_TEAM',
+        teamId: newTeam
+      }));
     }
   };
 
@@ -692,6 +720,36 @@ export default function PlayerRoom() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                Pilih Skuad Tim (4 Guild)
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['red', 'blue', 'green', 'gold'] as TeamId[]).map((tid) => {
+                  const cfg = TEAM_CONFIGS[tid];
+                  const active = teamId === tid;
+                  return (
+                    <button
+                      type="button"
+                      key={tid}
+                      onClick={() => {
+                        sound.playPop();
+                        setTeamId(tid);
+                      }}
+                      className={`p-2.5 rounded-xl border-2 border-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        active
+                          ? `${cfg.bgClass} ${cfg.textClass} shadow-[3px_3px_0px_#000] scale-[1.02]`
+                          : 'bg-[#0b0f19] text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="text-base">{cfg.icon}</span>
+                      <span>{cfg.shortName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={!wsConnected}
@@ -715,16 +773,51 @@ export default function PlayerRoom() {
         <div className="max-w-2xl mx-auto py-8 px-4 pb-24 text-center">
           <div className="arcade-card p-6 sm:p-8 bg-[#151c2c]">
             {/* Top Player Status & Mode Switch */}
-            <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b-2 border-black">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-4 border-b-2 border-black">
               <div className="flex items-center gap-3 text-left">
                 <span className="text-4xl p-2 bg-[#0b0f19] border-2 border-black rounded-xl shadow-[2px_2px_0px_#000]">{avatar}</span>
                 <div>
-                  <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-black text-white">{name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-black text-white">{name}</h2>
+                    {TEAM_CONFIGS[teamId] && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border border-black ${TEAM_CONFIGS[teamId].bgClass} ${TEAM_CONFIGS[teamId].textClass}`}>
+                        {TEAM_CONFIGS[teamId].icon} {TEAM_CONFIGS[teamId].shortName}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-amber-400 text-xs font-mono font-bold">ROOM PIN: {roomCode}</p>
                 </div>
               </div>
 
               {renderPlayerModeSwitcher()}
+            </div>
+
+            {/* Guild Team Switcher in Lobby */}
+            <div className="mb-5 bg-[#0b0f19] border-2 border-black rounded-xl p-3">
+              <span className="block text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider mb-2">
+                👥 Pilih Skuad Guild Kamu {teamMode ? '(Mode Battle Tim Aktif!)' : '(Seragam Karakter 3D)'}:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(['red', 'blue', 'green', 'gold'] as TeamId[]).map((tid) => {
+                  const cfg = TEAM_CONFIGS[tid];
+                  const active = teamId === tid;
+                  return (
+                    <button
+                      key={tid}
+                      type="button"
+                      onClick={() => changePlayerTeam(tid)}
+                      className={`py-2 px-2.5 rounded-lg border-2 border-black text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        active
+                          ? `${cfg.bgClass} ${cfg.textClass} shadow-[2px_2px_0px_#000]`
+                          : 'bg-[#151c2c] text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{cfg.icon}</span>
+                      <span>{cfg.shortName}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* 3D Roblox Interactive Arena in Lobby */}
@@ -1182,6 +1275,47 @@ export default function PlayerRoom() {
           {/* Interactive 3D Podium Stage */}
           {finalPodium.length > 0 && (
             <PodiumArena3D podium={finalPodium} worldTheme={worldTheme} />
+          )}
+
+          {/* Squad Standings Banner when Team Mode is Active */}
+          {teamMode && teamStandings.length > 0 && (
+            <div className="bg-[#151c2c] border-2 border-black p-4 rounded-xl mb-6 shadow-[4px_4px_0px_#000] text-left">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  ⚔️ Klasemen Akhir Skuad (Skor Rata-Rata Tim)
+                </span>
+                {teamStandings[0] && teamStandings[0].memberCount > 0 && (
+                  <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded bg-amber-400 text-slate-950 border border-black">
+                    🏆 JUARA: {teamStandings[0].icon} {teamStandings[0].name}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {teamStandings.map((t, idx) => {
+                  const cfg = TEAM_CONFIGS[t.teamId];
+                  const isMyTeam = t.teamId === teamId;
+                  return (
+                    <div
+                      key={t.teamId}
+                      className={`p-3 rounded-xl border-2 border-black ${cfg.bgClass} ${cfg.textClass} ${
+                        isMyTeam ? 'ring-2 ring-amber-400 shadow-[3px_3px_0px_#000]' : 'opacity-90'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs font-mono font-black mb-1">
+                        <span>#{idx + 1} {cfg.icon} {cfg.shortName}</span>
+                        <span>{t.memberCount} org</span>
+                      </div>
+                      <div className="text-lg font-mono font-black">{t.avgScore} pts</div>
+                      {isMyTeam && (
+                        <span className="inline-block mt-1 text-[10px] font-mono font-black bg-black/40 px-1.5 py-0.5 rounded text-amber-300">
+                          SKUADMU
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Player Personal Performance Report Card */}

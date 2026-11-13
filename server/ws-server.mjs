@@ -190,6 +190,47 @@ function broadcastQuizListUpdate() {
   });
 }
 
+const TEAM_META = {
+  red: { id: 'red', name: 'Skuad Naga Merah', icon: '🔥', colorHex: '#ef4444' },
+  blue: { id: 'blue', name: 'Skuad Hiu Biru', icon: '🌊', colorHex: '#3b82f6' },
+  green: { id: 'green', name: 'Skuad Rimba Hijau', icon: '🌿', colorHex: '#10b981' },
+  gold: { id: 'gold', name: 'Skuad Petir Emas', icon: '⚡', colorHex: '#eab308' },
+};
+
+function pickBalancedTeam(room) {
+  const counts = { red: 0, blue: 0, green: 0, gold: 0 };
+  for (const p of room.players.values()) {
+    if (p.teamId && counts[p.teamId] !== undefined) {
+      counts[p.teamId]++;
+    }
+  }
+  const sorted = Object.keys(counts).sort((a, b) => counts[a] - counts[b]);
+  return sorted[0] || 'red';
+}
+
+function getTeamStandings(room) {
+  const map = {
+    red: { ...TEAM_META.red, totalScore: 0, avgScore: 0, memberCount: 0 },
+    blue: { ...TEAM_META.blue, totalScore: 0, avgScore: 0, memberCount: 0 },
+    green: { ...TEAM_META.green, totalScore: 0, avgScore: 0, memberCount: 0 },
+    gold: { ...TEAM_META.gold, totalScore: 0, avgScore: 0, memberCount: 0 },
+  };
+
+  for (const p of room.players.values()) {
+    const tid = p.teamId && map[p.teamId] ? p.teamId : 'red';
+    map[tid].totalScore += p.score || 0;
+    map[tid].memberCount += 1;
+  }
+
+  const arr = Object.values(map).map((t) => ({
+    ...t,
+    avgScore: t.memberCount > 0 ? Math.round(t.totalScore / t.memberCount) : 0,
+  }));
+
+  arr.sort((a, b) => b.totalScore - a.totalScore || b.memberCount - a.memberCount);
+  return arr.map((t, idx) => ({ ...t, rank: idx + 1 }));
+}
+
 function getPlayerList(room) {
   const list = [];
   const totalQ = room.quiz && Array.isArray(room.quiz.questions) ? room.quiz.questions.length : 5;
@@ -201,6 +242,7 @@ function getPlayerList(room) {
       id: p.id,
       name: p.name,
       avatar: p.avatar,
+      teamId: p.teamId || 'red',
       score: p.score,
       streak: p.streak,
       maxStreak: p.maxStreak || p.streak || 0,
@@ -337,7 +379,13 @@ function passBombToNext(room, fromPlayer, reason) {
   let targetId = 'bot_target';
   let toName = '🤖 RoboTarget';
 
-  const otherPlayers = Array.from(room.players.values()).filter(p => p.id !== fromPlayer.id);
+  const allOthers = Array.from(room.players.values()).filter(p => p.id !== fromPlayer.id);
+  // In teamMode, prioritize passing the bomb to opposing team members!
+  const enemyOthers = room.teamMode
+    ? allOthers.filter(p => p.teamId !== fromPlayer.teamId)
+    : allOthers;
+  const otherPlayers = enemyOthers.length > 0 ? enemyOthers : allOthers;
+
   if (otherPlayers.length > 0) {
     const uncommitted = otherPlayers.filter(p => p.currentAnswer === null);
     const chosen = uncommitted.length > 0
@@ -450,7 +498,8 @@ function endCurrentQuestion(room) {
       optionCounts,
       totalAnswers
     },
-    leaderboard
+    leaderboard,
+    teamStandings: getTeamStandings(room)
   });
 }
 
@@ -570,6 +619,7 @@ wss.on('connection', (ws) => {
           const gameMode = ['bomb_tag', 'glass_bridge', 'lava_tiles', 'classic'].includes(data.gameMode) ? data.gameMode : 'bomb_tag';
           const validThemes = ['arcade', 'pirate', 'space', 'castle'];
           const worldTheme = validThemes.includes(data.worldTheme) ? data.worldTheme : 'arcade';
+          const teamMode = !!data.teamMode;
           
           const room = {
             code,
@@ -577,6 +627,7 @@ wss.on('connection', (ws) => {
             quiz: selectedQuiz,
             gameMode,
             worldTheme,
+            teamMode,
             bombHolderId: null,
             lastBombPassTime: 0,
             phase: 'LOBBY',
@@ -596,6 +647,7 @@ wss.on('connection', (ws) => {
             code,
             gameMode: room.gameMode,
             worldTheme: room.worldTheme,
+            teamMode: room.teamMode,
             quiz: {
               id: selectedQuiz.id,
               title: selectedQuiz.title,
@@ -634,10 +686,14 @@ wss.on('connection', (ws) => {
             spawnZ = (Math.random() - 0.5) * 6;
           }
 
+          const validTeamIds = ['red', 'blue', 'green', 'gold'];
+          const chosenTeamId = validTeamIds.includes(data.teamId) ? data.teamId : pickBalancedTeam(room);
+
           const newPlayer = {
             id: playerId,
             name,
             avatar,
+            teamId: chosenTeamId,
             ws,
             score: 0,
             streak: 0,
@@ -666,6 +722,8 @@ wss.on('connection', (ws) => {
             playerId,
             code,
             name,
+            teamId: chosenTeamId,
+            teamMode: !!room.teamMode,
             gameMode: room.gameMode,
             worldTheme: room.worldTheme,
             quizTitle: room.quiz.title,
@@ -675,7 +733,8 @@ wss.on('connection', (ws) => {
           const players = getPlayerList(room);
           broadcastToRoom(room, {
             type: 'PLAYER_LIST_UPDATE',
-            players
+            players,
+            teamStandings: getTeamStandings(room)
           });
 
           console.log(`[WS] Player ${name} joined room ${code} (Mode: ${room.gameMode}, Theme: ${room.worldTheme})`);
@@ -721,6 +780,34 @@ wss.on('connection', (ws) => {
             });
             console.log(`[WS] Room ${boundRoom.code} worldTheme changed to ${theme}`);
           }
+          break;
+        }
+
+        case 'SET_TEAM_MODE': {
+          if (!isHost || !boundRoom) return;
+          boundRoom.teamMode = !!data.teamMode;
+          broadcastToRoom(boundRoom, {
+            type: 'TEAM_MODE_UPDATED',
+            teamMode: boundRoom.teamMode,
+            players: getPlayerList(boundRoom),
+            teamStandings: getTeamStandings(boundRoom)
+          });
+          console.log(`[WS] Room ${boundRoom.code} teamMode changed to ${boundRoom.teamMode}`);
+          break;
+        }
+
+        case 'CHANGE_TEAM': {
+          if (!boundRoom || !boundPlayerId) return;
+          const validTeamIds = ['red', 'blue', 'green', 'gold'];
+          if (!validTeamIds.includes(data.teamId)) return;
+          const player = boundRoom.players.get(boundPlayerId);
+          if (!player) return;
+          player.teamId = data.teamId;
+          broadcastToRoom(boundRoom, {
+            type: 'PLAYER_LIST_UPDATE',
+            players: getPlayerList(boundRoom),
+            teamStandings: getTeamStandings(boundRoom)
+          });
           break;
         }
 
@@ -887,14 +974,17 @@ wss.on('connection', (ws) => {
               if (room.bombHolderId === player.id) {
                 // Current player holds the bomb - check if touching another player or bot
                 let passed = false;
-                for (const other of room.players.values()) {
-                  if (other.id !== player.id) {
-                    const dist = Math.hypot(player.x - other.x, player.z - other.z);
-                    if (dist < 1.8) {
-                      passBombToNext(room, player, 'physical_tag');
-                      passed = true;
-                      break;
-                    }
+                const allOthers = Array.from(room.players.values()).filter(o => o.id !== player.id);
+                const hasEnemyInRoom = room.teamMode && allOthers.some(o => o.teamId !== player.teamId);
+
+                for (const other of allOthers) {
+                  // Protect teammates from accidental bomb tag if enemies exist in the room!
+                  if (hasEnemyInRoom && other.teamId === player.teamId) continue;
+                  const dist = Math.hypot(player.x - other.x, player.z - other.z);
+                  if (dist < 1.8) {
+                    passBombToNext(room, player, 'physical_tag');
+                    passed = true;
+                    break;
                   }
                 }
                 if (!passed) {
@@ -954,7 +1044,8 @@ wss.on('connection', (ws) => {
             broadcastToRoom(room, {
               type: 'GAME_OVER',
               finalPodium: finalLeaderboard,
-              awards
+              awards,
+              teamStandings: getTeamStandings(room)
             });
           }
           break;
@@ -993,7 +1084,8 @@ wss.on('connection', (ws) => {
           const players = getPlayerList(room);
           broadcastToRoom(room, {
             type: 'GAME_RESET',
-            players
+            players,
+            teamStandings: getTeamStandings(room)
           });
           break;
         }

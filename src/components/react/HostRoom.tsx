@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { PlayerSummary, QuizQuestion, AnswerStats, GameMode, WorldTheme, PostGameAward } from '../../types/quiz';
+import { TEAM_CONFIGS, type PlayerSummary, type QuizQuestion, type AnswerStats, type GameMode, type WorldTheme, type PostGameAward, type TeamSummary, type TeamId } from '../../types/quiz';
 import { DEFAULT_QUIZZES } from '../../data/default-quizzes';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
@@ -67,6 +67,8 @@ export default function HostRoom() {
   const [audioState, setAudioState] = useState(() => sound.getState());
   const [gameMode, setGameMode] = useState<GameMode>('bomb_tag');
   const [worldTheme, setWorldTheme] = useState<WorldTheme>('arcade');
+  const [teamMode, setTeamMode] = useState(false);
+  const [teamStandings, setTeamStandings] = useState<TeamSummary[]>([]);
 
   useEffect(() => {
     return sound.subscribe((st) => setAudioState(st));
@@ -120,7 +122,7 @@ export default function HostRoom() {
           else if (pendingQuizId === 'general-science') selectedTheme = 'space';
           else if (pendingQuizId === 'brain-teasers-logic') selectedTheme = 'castle';
         }
-        ws.send(JSON.stringify({ type: 'CREATE_ROOM', quizId: pendingQuizId, gameMode, worldTheme: selectedTheme }));
+        ws.send(JSON.stringify({ type: 'CREATE_ROOM', quizId: pendingQuizId, gameMode, worldTheme: selectedTheme, teamMode }));
       }
     };
 
@@ -180,6 +182,7 @@ export default function HostRoom() {
         setQuizMeta({ title: msg.quiz.title, count: msg.quiz.questionCount });
         if (msg.gameMode) setGameMode(msg.gameMode);
         if (msg.worldTheme) setWorldTheme(msg.worldTheme);
+        if (typeof msg.teamMode === 'boolean') setTeamMode(msg.teamMode);
         setPhase('LOBBY');
         break;
 
@@ -193,8 +196,16 @@ export default function HostRoom() {
         sound.playPop();
         break;
 
+      case 'TEAM_MODE_UPDATED':
+        if (typeof msg.teamMode === 'boolean') setTeamMode(msg.teamMode);
+        if (msg.players) setPlayers(msg.players);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
+        sound.playPop();
+        break;
+
       case 'PLAYER_LIST_UPDATE':
         setPlayers(msg.players || []);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         sound.playPop();
         break;
 
@@ -270,6 +281,7 @@ export default function HostRoom() {
         setAnswerStats(msg.stats);
         if (msg.explodedPlayerId) setExplodedPlayerId(msg.explodedPlayerId);
         if (msg.leaderboard) setPlayers(msg.leaderboard);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         if (msg.explodedPlayerId) {
           sound.playExplosion();
         } else if (gameMode === 'glass_bridge') {
@@ -284,6 +296,7 @@ export default function HostRoom() {
         setPhase('FINISHED');
         setFinalPodium(msg.finalPodium || []);
         setPostGameAwards(msg.awards || []);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         confetti({
           particleCount: 120,
           spread: 80,
@@ -295,6 +308,7 @@ export default function HostRoom() {
       case 'GAME_RESET':
         setPhase('LOBBY');
         setPlayers(msg.players || []);
+        if (msg.teamStandings) setTeamStandings(msg.teamStandings);
         setAnswerStats(null);
         setPostGameAwards([]);
         setCurrentQuestion(null);
@@ -339,12 +353,175 @@ export default function HostRoom() {
 
   const createRoom = (quizId: string) => {
     setErrorMsg(null);
+    let selectedTheme = worldTheme;
+    if (worldTheme === 'arcade') {
+      if (quizId === 'history-ocean-mystery') selectedTheme = 'pirate';
+      else if (quizId === 'general-science') selectedTheme = 'space';
+      else if (quizId === 'brain-teasers-logic') selectedTheme = 'castle';
+    }
+    if (selectedTheme !== worldTheme) {
+      setWorldTheme(selectedTheme);
+    }
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode, worldTheme }));
+      wsRef.current.send(JSON.stringify({ type: 'CREATE_ROOM', quizId, gameMode, worldTheme: selectedTheme, teamMode }));
     } else {
       pendingCreateQuizIdRef.current = quizId;
       connectWs();
     }
+  };
+
+  const toggleTeamMode = (enabled: boolean) => {
+    setTeamMode(enabled);
+    sound.playPop();
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(JSON.stringify({ type: 'SET_TEAM_MODE', teamMode: enabled }));
+    }
+  };
+
+  const renderTeamModeSelector = (compact = false) => {
+    if (compact) {
+      return (
+        <div className="inline-flex items-center gap-1 bg-[#0b0f19] border-2 border-black p-1 rounded-xl shadow-[2px_2px_0px_#000]">
+          <button
+            type="button"
+            onClick={() => toggleTeamMode(false)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border ${
+              !teamMode
+                ? 'bg-amber-400 text-slate-950 border-black'
+                : 'text-slate-400 hover:text-white border-transparent'
+            }`}
+          >
+            👤 Individu
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleTeamMode(true)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border ${
+              teamMode
+                ? 'bg-emerald-400 text-slate-950 border-black'
+                : 'text-slate-400 hover:text-white border-transparent'
+            }`}
+          >
+            👥 4 Tim Skuad
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-8">
+        <h3 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>FORMAT KOMPETISI (SOLO VS BATTLE SKUAD 4 TIM):</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => toggleTeamMode(false)}
+            className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer iso-tile flex items-center justify-between gap-4 ${
+              !teamMode
+                ? 'bg-amber-400 text-slate-950 shadow-[5px_5px_0px_#000]'
+                : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[3px_3px_0px_#000]'
+            }`}
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">👤</span>
+                <span className="font-['Space_Grotesk'] font-black text-base">Mode Individu (Free-For-All)</span>
+              </div>
+              <p className="text-xs opacity-90">Setiap pemain bertanding sendiri memperebutkan Podium Juara 1, 2, dan 3.</p>
+            </div>
+            <span className={`px-2.5 py-1 rounded text-[10px] font-mono font-black shrink-0 ${
+              !teamMode ? 'bg-black text-amber-400' : 'bg-[#0b0f19] text-slate-400 border border-black'
+            }`}>
+              {!teamMode ? 'AKTIF' : 'PILIH'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => toggleTeamMode(true)}
+            className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer iso-tile flex items-center justify-between gap-4 ${
+              teamMode
+                ? 'bg-emerald-400 text-slate-950 shadow-[5px_5px_0px_#000]'
+                : 'bg-[#151c2c] text-slate-200 hover:bg-[#1e293b] shadow-[3px_3px_0px_#000]'
+            }`}
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">👥</span>
+                <span className="font-['Space_Grotesk'] font-black text-base">Mode Battle Tim / 4 Skuad Guild</span>
+              </div>
+              <p className="text-xs opacity-90">Pemain bergabung ke 🔥 Tim Merah, 🌊 Biru, 🌿 Hijau, atau ⚡ Emas. Bebas friendly-fire bom!</p>
+            </div>
+            <span className={`px-2.5 py-1 rounded text-[10px] font-mono font-black shrink-0 ${
+              teamMode ? 'bg-black text-emerald-400' : 'bg-[#0b0f19] text-slate-400 border border-black'
+            }`}>
+              {teamMode ? 'AKTIF' : 'PILIH'}
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTeamStandingsBanner = () => {
+    if (!teamMode) return null;
+    const list: TeamSummary[] = teamStandings.length > 0
+      ? teamStandings
+      : (['red', 'blue', 'green', 'gold'] as TeamId[]).map((tid, idx) => ({
+          id: tid,
+          name: TEAM_CONFIGS[tid].name,
+          icon: TEAM_CONFIGS[tid].icon,
+          colorHex: TEAM_CONFIGS[tid].colorHex,
+          totalScore: 0,
+          avgScore: 0,
+          memberCount: players.filter((p) => p.teamId === tid).length,
+          rank: idx + 1,
+        }));
+
+    return (
+      <div className="iso-card bg-[#151c2c] p-5 mb-6 border-2 border-black">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b-2 border-black">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🛡️</span>
+            <h3 className="font-['Space_Grotesk'] font-black text-white text-sm sm:text-base uppercase">
+              Papan Klasemen Battle Skuad (4 Guild)
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono font-bold text-emerald-400 bg-[#0b0f19] px-2.5 py-0.5 rounded border border-black">
+            Rekan setim kebal operan bom jika masih ada lawan
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {list.map((t, idx) => {
+            const cfg = TEAM_CONFIGS[t.id] || TEAM_CONFIGS.red;
+            const isLeading = idx === 0 && t.totalScore > 0;
+            return (
+              <div
+                key={t.id}
+                className={`p-3.5 rounded-xl border-2 border-black flex flex-col justify-between ${
+                  isLeading ? 'bg-[#1e293b] ring-2 ring-amber-400 shadow-[4px_4px_0px_#000]' : 'bg-[#0b0f19] shadow-[2px_2px_0px_#000]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-black border border-black ${cfg.bgClass} ${cfg.textClass}`}>
+                    {cfg.icon} {cfg.shortName}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {t.memberCount} Anggota
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold text-slate-300 truncate">{cfg.name}</span>
+                  <span className="font-mono font-black text-base text-amber-400">{t.totalScore} pts</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const changeGameMode = (newMode: GameMode) => {
@@ -705,6 +882,9 @@ export default function HostRoom() {
         {/* Mode Selector Neo-Brutalist */}
         {renderModeSelector(false)}
 
+        {/* Team Mode Selector (Solo vs 4 Guilds) */}
+        {renderTeamModeSelector(false)}
+
         {/* World Theme Selector Neo-Brutalist */}
         {renderWorldThemeSelector(false)}
 
@@ -808,6 +988,7 @@ export default function HostRoom() {
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 {renderModeSelector(true)}
+                {renderTeamModeSelector(true)}
                 {renderWorldThemeSelector(true)}
                 {renderAudioControls()}
               </div>
@@ -893,6 +1074,9 @@ export default function HostRoom() {
             </div>
           )}
 
+          {/* Team Standings Banner in Lobby (if Team Mode active) */}
+          {renderTeamStandingsBanner()}
+
           {/* Players Area */}
           <div className="arcade-card p-6 sm:p-8 bg-[#151c2c] mb-8">
             <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-black">
@@ -930,15 +1114,23 @@ export default function HostRoom() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {players.map((p) => (
-                  <div 
-                    key={p.id}
-                    className="bg-[#1e293b] border-2 border-black p-3.5 text-center rounded-xl shadow-[2px_2px_0px_#000]"
-                  >
-                    <span className="text-3xl block mb-1">{p.avatar}</span>
-                    <p className="font-bold text-white text-xs truncate">{p.name}</p>
-                  </div>
-                ))}
+                {players.map((p) => {
+                  const tCfg = p.teamId && TEAM_CONFIGS[p.teamId] ? TEAM_CONFIGS[p.teamId] : null;
+                  return (
+                    <div 
+                      key={p.id}
+                      className="bg-[#1e293b] border-2 border-black p-3.5 text-center rounded-xl shadow-[2px_2px_0px_#000] relative"
+                    >
+                      {teamMode && tCfg && (
+                        <span className={`inline-block mb-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-black border border-black ${tCfg.bgClass} ${tCfg.textClass}`}>
+                          {tCfg.icon} {tCfg.shortName}
+                        </span>
+                      )}
+                      <span className="text-3xl block mb-1">{p.avatar}</span>
+                      <p className="font-bold text-white text-xs truncate">{p.name}</p>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1154,6 +1346,9 @@ export default function HostRoom() {
             </>
           )}
 
+          {/* Inter-Question Team Standings Banner */}
+          {isReview && renderTeamStandingsBanner()}
+
           {/* Inter-Question Live Leaderboard */}
           {isReview && players.length > 0 && (
             <div className="arcade-card p-5 mb-6 bg-[#151c2c]">
@@ -1237,6 +1432,9 @@ export default function HostRoom() {
 
           {/* Interactive 3D Podium Stage */}
           <PodiumArena3D podium={finalPodium} worldTheme={worldTheme} />
+
+          {/* Final Team Battle Standings Banner */}
+          {renderTeamStandingsBanner()}
 
           {/* Podium Graphic Neo-Brutalist */}
           <div className="flex items-end justify-center gap-3 sm:gap-4 mb-10 max-w-xl mx-auto">

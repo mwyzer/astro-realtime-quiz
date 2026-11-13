@@ -7,6 +7,7 @@ export interface Player3DData {
   id: string;
   name: string;
   avatar: string;
+  teamId?: 'red' | 'blue' | 'green' | 'gold' | null;
   x?: number;
   z?: number;
   jumping?: boolean;
@@ -1536,11 +1537,27 @@ export default function RobloxArena3D({
       }
 
       // Update actual room players
+      const teamTorsoMap: Record<string, { hex: number; icon: string }> = {
+        red: { hex: 0xef4444, icon: '🔥' },
+        blue: { hex: 0x3b82f6, icon: '🌊' },
+        green: { hex: 0x10b981, icon: '🌿' },
+        gold: { hex: 0xeab308, icon: '⚡' },
+      };
+
       currentPlayers.forEach((p, idx) => {
         activeIds.add(p.id);
+        const existingChar = characterGroups.get(p.id);
+        if (existingChar && existingChar.userData.teamId !== p.teamId) {
+          scene.remove(existingChar);
+          characterGroups.delete(p.id);
+        }
+
         if (!characterGroups.has(p.id)) {
-          const color = TORSO_COLORS[idx % TORSO_COLORS.length];
-          const char = createRobloxCharacter(p.name, p.avatar, color);
+          const teamCfg = p.teamId ? teamTorsoMap[p.teamId] : undefined;
+          const color = teamCfg ? teamCfg.hex : TORSO_COLORS[idx % TORSO_COLORS.length];
+          const displayAvatar = teamCfg ? `${teamCfg.icon}${p.avatar}` : p.avatar;
+          const char = createRobloxCharacter(p.name, displayAvatar, color);
+          char.userData.teamId = p.teamId;
           characterGroups.set(p.id, char);
           scene.add(char);
         }
