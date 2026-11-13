@@ -728,6 +728,20 @@ export default function HostRoom() {
           </div>
         )}
 
+        {/* Grid Paket Soal Header + AI Bank Soal CTA */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+            <span>PILIH PAKET SOAL ({availableQuizzes.length} TERSEDIA):</span>
+          </h3>
+          <a
+            href="/bank"
+            className="iso-btn bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <span>✨ Generator Kuis AI & Import Soal Baru</span>
+            <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+          </a>
+        </div>
+
         {/* Grid Paket Soal */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {availableQuizzes.map((quiz) => {
