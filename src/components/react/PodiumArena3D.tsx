@@ -314,7 +314,12 @@ export default function PodiumArena3D({ podium, worldTheme = 'arcade' }: PodiumA
       scene.add(blockMesh);
 
       if (slot.player) {
-        const charObj = createChampionCharacter(slot.player, slot.rank, TORSO_COLORS[idx % TORSO_COLORS.length]);
+        let customTorso = TORSO_COLORS[idx % TORSO_COLORS.length];
+        if (slot.player.outfitColor && slot.player.outfitColor.startsWith('#')) {
+          const parsed = parseInt(slot.player.outfitColor.slice(1), 16);
+          if (!Number.isNaN(parsed)) customTorso = parsed;
+        }
+        const charObj = createChampionCharacter(slot.player, slot.rank, customTorso);
         charObj.group.position.set(slot.x, slot.height + 0.1, slot.z);
         scene.add(charObj.group);
         animatedCharacters.push({

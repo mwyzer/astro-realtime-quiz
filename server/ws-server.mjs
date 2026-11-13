@@ -243,6 +243,8 @@ function getPlayerList(room) {
       name: p.name,
       avatar: p.avatar,
       teamId: p.teamId || 'red',
+      hatId: p.hatId || 'none',
+      outfitColor: p.outfitColor || '#ec4899',
       score: p.score,
       streak: p.streak,
       maxStreak: p.maxStreak || p.streak || 0,
@@ -688,12 +690,19 @@ wss.on('connection', (ws) => {
 
           const validTeamIds = ['red', 'blue', 'green', 'gold'];
           const chosenTeamId = validTeamIds.includes(data.teamId) ? data.teamId : pickBalancedTeam(room);
+          const validHats = ['none', 'crown', 'wizard', 'astronaut', 'viking', 'halo', 'headphones'];
+          const chosenHat = validHats.includes(data.hatId) ? data.hatId : 'none';
+          const chosenOutfitColor = typeof data.outfitColor === 'string' && data.outfitColor.startsWith('#')
+            ? data.outfitColor
+            : '#ec4899';
 
           const newPlayer = {
             id: playerId,
             name,
             avatar,
             teamId: chosenTeamId,
+            hatId: chosenHat,
+            outfitColor: chosenOutfitColor,
             ws,
             score: 0,
             streak: 0,
@@ -723,6 +732,8 @@ wss.on('connection', (ws) => {
             code,
             name,
             teamId: chosenTeamId,
+            hatId: chosenHat,
+            outfitColor: chosenOutfitColor,
             teamMode: !!room.teamMode,
             gameMode: room.gameMode,
             worldTheme: room.worldTheme,
@@ -803,6 +814,28 @@ wss.on('connection', (ws) => {
           const player = boundRoom.players.get(boundPlayerId);
           if (!player) return;
           player.teamId = data.teamId;
+          broadcastToRoom(boundRoom, {
+            type: 'PLAYER_LIST_UPDATE',
+            players: getPlayerList(boundRoom),
+            teamStandings: getTeamStandings(boundRoom)
+          });
+          break;
+        }
+
+        case 'UPDATE_CUSTOMIZATION': {
+          if (!boundRoom || !boundPlayerId) return;
+          const player = boundRoom.players.get(boundPlayerId);
+          if (!player) return;
+          const validHats = ['none', 'crown', 'wizard', 'astronaut', 'viking', 'halo', 'headphones'];
+          if (typeof data.hatId === 'string' && validHats.includes(data.hatId)) {
+            player.hatId = data.hatId;
+          }
+          if (typeof data.outfitColor === 'string' && data.outfitColor.startsWith('#')) {
+            player.outfitColor = data.outfitColor;
+          }
+          if (typeof data.avatar === 'string' && data.avatar.trim()) {
+            player.avatar = data.avatar.trim();
+          }
           broadcastToRoom(boundRoom, {
             type: 'PLAYER_LIST_UPDATE',
             players: getPlayerList(boundRoom),

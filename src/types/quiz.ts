@@ -24,6 +24,42 @@ export type WorldTheme = 'arcade' | 'pirate' | 'space' | 'castle';
 
 export type TeamId = 'red' | 'blue' | 'green' | 'gold';
 
+export type HatId = 'none' | 'crown' | 'wizard' | 'astronaut' | 'viking' | 'halo' | 'headphones';
+
+export interface HatConfig {
+  id: HatId;
+  name: string;
+  icon: string;
+}
+
+export const HAT_CONFIGS: HatConfig[] = [
+  { id: 'none', name: 'Tanpa Topi', icon: '✖️' },
+  { id: 'crown', name: 'Mahkota Emas', icon: '👑' },
+  { id: 'wizard', name: 'Topi Penyihir', icon: '🧙‍♂️' },
+  { id: 'astronaut', name: 'Helm Astronot', icon: '👨‍🚀' },
+  { id: 'viking', name: 'Helm Viking', icon: '⚔️' },
+  { id: 'halo', name: 'Cincin Malaikat', icon: '😇' },
+  { id: 'headphones', name: 'Headphone Cyber', icon: '🎧' },
+];
+
+export interface OutfitColorConfig {
+  id: string;
+  name: string;
+  hex: string;
+  num: number;
+}
+
+export const OUTFIT_COLORS: OutfitColorConfig[] = [
+  { id: 'pink', name: 'Neon Pink', hex: '#ec4899', num: 0xec4899 },
+  { id: 'purple', name: 'Cyber Purple', hex: '#8b5cf6', num: 0x8b5cf6 },
+  { id: 'cyan', name: 'Electric Cyan', hex: '#06b6d4', num: 0x06b6d4 },
+  { id: 'orange', name: 'Blaze Orange', hex: '#f97316', num: 0xf97316 },
+  { id: 'emerald', name: 'Emerald Green', hex: '#10b981', num: 0x10b981 },
+  { id: 'crimson', name: 'Crimson Red', hex: '#ef4444', num: 0xef4444 },
+  { id: 'gold', name: 'Royal Gold', hex: '#eab308', num: 0xeab308 },
+  { id: 'stealth', name: 'Obsidian Dark', hex: '#334155', num: 0x334155 },
+];
+
 export interface TeamSummary {
   id: TeamId;
   name: string;
@@ -79,6 +115,8 @@ export interface PlayerSummary {
   name: string;
   avatar: string;
   teamId?: TeamId | null;
+  hatId?: HatId;
+  outfitColor?: string;
   score: number;
   streak: number;
   maxStreak?: number;

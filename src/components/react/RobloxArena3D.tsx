@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import type { WorldTheme } from '../../types/quiz';
+import type { WorldTheme, HatId } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 
 export interface Player3DData {
@@ -8,6 +8,8 @@ export interface Player3DData {
   name: string;
   avatar: string;
   teamId?: 'red' | 'blue' | 'green' | 'gold' | null;
+  hatId?: HatId;
+  outfitColor?: string;
   x?: number;
   z?: number;
   jumping?: boolean;
@@ -1152,10 +1154,127 @@ export default function RobloxArena3D({
       });
     }
 
-    // 6. Character Factory (Roblox Blocky Character with Limbs & Nametag Sprite)
+    // 6. Character Factory (Roblox Blocky Character with Limbs, 3D Hat & Nametag Sprite)
     const characterGroups = new Map<string, THREE.Group>();
 
-    const createRobloxCharacter = (nameText: string, avatarEmoji: string, torsoHex: number) => {
+    const create3DHatMesh = (hatId?: HatId): THREE.Group | null => {
+      if (!hatId || hatId === 'none') return null;
+      const hatGroup = new THREE.Group();
+
+      if (hatId === 'crown') {
+        const goldMat = new THREE.MeshStandardMaterial({
+          color: 0xfacc15,
+          emissive: 0xd97706,
+          emissiveIntensity: 0.35,
+          metalness: 0.7,
+          roughness: 0.2,
+        });
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.28, 0.22, 10), goldMat);
+        ring.position.y = 2.41;
+        hatGroup.add(ring);
+
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2;
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), goldMat);
+          spike.position.set(Math.cos(ang) * 0.22, 2.58, Math.sin(ang) * 0.22);
+          hatGroup.add(spike);
+        }
+        const gem = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.09),
+          new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.7 })
+        );
+        gem.position.set(0, 2.42, 0.31);
+        hatGroup.add(gem);
+      } else if (hatId === 'wizard') {
+        const wizMat = new THREE.MeshStandardMaterial({ color: 0x6d28d9, roughness: 0.5 });
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.06, 16), wizMat);
+        brim.position.y = 2.33;
+        hatGroup.add(brim);
+
+        const band = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.31, 0.33, 0.09, 12),
+          new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xd97706, emissiveIntensity: 0.3 })
+        );
+        band.position.y = 2.39;
+        hatGroup.add(band);
+
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.31, 0.78, 12), wizMat);
+        cone.position.y = 2.75;
+        cone.rotation.z = -0.12;
+        hatGroup.add(cone);
+      } else if (hatId === 'astronaut') {
+        const helmetMat = new THREE.MeshStandardMaterial({
+          color: 0xf8fafc,
+          roughness: 0.2,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.9,
+        });
+        const dome = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.84, 0.86), helmetMat);
+        dome.position.y = 1.97;
+        hatGroup.add(dome);
+
+        const visorMat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.45,
+          metalness: 0.8,
+          roughness: 0.15,
+        });
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.46, 0.08), visorMat);
+        visor.position.set(0, 1.98, 0.42);
+        hatGroup.add(visor);
+      } else if (hatId === 'viking') {
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.6, roughness: 0.35 });
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.26, 12), ironMat);
+        cap.position.y = 2.38;
+        hatGroup.add(cap);
+
+        const hornMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.3 });
+        const leftHorn = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.45, 8), hornMat);
+        leftHorn.position.set(-0.46, 2.52, 0);
+        leftHorn.rotation.z = 0.65;
+        hatGroup.add(leftHorn);
+
+        const rightHorn = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.45, 8), hornMat);
+        rightHorn.position.set(0.46, 2.52, 0);
+        rightHorn.rotation.z = -0.65;
+        hatGroup.add(rightHorn);
+      } else if (hatId === 'halo') {
+        const haloMat = new THREE.MeshStandardMaterial({
+          color: 0xfef08a,
+          emissive: 0xfacc15,
+          emissiveIntensity: 0.85,
+          roughness: 0.1,
+        });
+        const torus = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 10, 24), haloMat);
+        torus.rotation.x = Math.PI / 2;
+        torus.position.y = 2.62;
+        hatGroup.add(torus);
+      } else if (hatId === 'headphones') {
+        const bandMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+        const neonMat = new THREE.MeshStandardMaterial({
+          color: 0x06b6d4,
+          emissive: 0x06b6d4,
+          emissiveIntensity: 0.65,
+        });
+        const topBand = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.1, 0.2), bandMat);
+        topBand.position.y = 2.36;
+        hatGroup.add(topBand);
+
+        const leftCup = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.36, 0.34), neonMat);
+        leftCup.position.set(-0.42, 1.98, 0);
+        hatGroup.add(leftCup);
+
+        const rightCup = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.36, 0.34), neonMat);
+        rightCup.position.set(0.42, 1.98, 0);
+        hatGroup.add(rightCup);
+      }
+
+      return hatGroup;
+    };
+
+    const createRobloxCharacter = (nameText: string, avatarEmoji: string, torsoHex: number, hatId?: HatId) => {
       const group = new THREE.Group();
 
       // Torso
@@ -1196,6 +1315,12 @@ export default function RobloxArena3D({
       const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.68), faceMat);
       faceMesh.position.set(0, 1.95, 0.355);
       group.add(faceMesh);
+
+      // Optional 3D Hat / Headgear
+      const hatMesh = create3DHatMesh(hatId);
+      if (hatMesh) {
+        group.add(hatMesh);
+      }
 
       // Arms
       const armMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 });
@@ -1249,7 +1374,7 @@ export default function RobloxArena3D({
       canvasTextures.push(tagTex);
       const tagMat = new THREE.SpriteMaterial({ map: tagTex, depthTest: false });
       const tagSprite = new THREE.Sprite(tagMat);
-      tagSprite.position.set(0, 2.8, 0);
+      tagSprite.position.set(0, hatId && hatId !== 'none' ? 3.25 : 2.8, 0);
       tagSprite.scale.set(2.8, 0.7, 1);
       group.add(tagSprite);
 
@@ -1260,6 +1385,7 @@ export default function RobloxArena3D({
         rightLeg,
         avatarEmoji,
         nameText,
+        hatId: hatId || 'none',
       };
 
       return group;
@@ -1547,17 +1673,32 @@ export default function RobloxArena3D({
       currentPlayers.forEach((p, idx) => {
         activeIds.add(p.id);
         const existingChar = characterGroups.get(p.id);
-        if (existingChar && existingChar.userData.teamId !== p.teamId) {
+        const targetHat = p.hatId || 'none';
+        const targetOutfit = p.outfitColor || '';
+        if (
+          existingChar &&
+          (existingChar.userData.teamId !== p.teamId ||
+            existingChar.userData.hatId !== targetHat ||
+            existingChar.userData.outfitColor !== targetOutfit ||
+            existingChar.userData.rawAvatar !== p.avatar)
+        ) {
           scene.remove(existingChar);
           characterGroups.delete(p.id);
         }
 
         if (!characterGroups.has(p.id)) {
           const teamCfg = p.teamId ? teamTorsoMap[p.teamId] : undefined;
-          const color = teamCfg ? teamCfg.hex : TORSO_COLORS[idx % TORSO_COLORS.length];
+          let customHexNum = teamCfg ? teamCfg.hex : TORSO_COLORS[idx % TORSO_COLORS.length];
+          if (p.outfitColor && p.outfitColor.startsWith('#')) {
+            const parsed = parseInt(p.outfitColor.slice(1), 16);
+            if (!Number.isNaN(parsed)) customHexNum = parsed;
+          }
           const displayAvatar = teamCfg ? `${teamCfg.icon}${p.avatar}` : p.avatar;
-          const char = createRobloxCharacter(p.name, displayAvatar, color);
+          const char = createRobloxCharacter(p.name, displayAvatar, customHexNum, targetHat);
           char.userData.teamId = p.teamId;
+          char.userData.hatId = targetHat;
+          char.userData.outfitColor = targetOutfit;
+          char.userData.rawAvatar = p.avatar;
           characterGroups.set(p.id, char);
           scene.add(char);
         }

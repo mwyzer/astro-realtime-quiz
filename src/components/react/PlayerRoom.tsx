@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TEAM_CONFIGS, type GameMode, type WorldTheme, type PlayerSummary, type PostGameAward, type TeamId, type TeamSummary } from '../../types/quiz';
+import { TEAM_CONFIGS, HAT_CONFIGS, OUTFIT_COLORS, type GameMode, type WorldTheme, type PlayerSummary, type PostGameAward, type TeamId, type TeamSummary, type HatId } from '../../types/quiz';
 import { sound } from './SoundPlayer';
 import confetti from 'canvas-confetti';
 import RobloxArena3D, { type Player3DData } from './RobloxArena3D';
@@ -33,10 +33,12 @@ export default function PlayerRoom() {
   const [wsConnected, setWsConnected] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Join Inputs
+  // Join Inputs & 3D Character Customization
   const [pin, setPin] = useState('');
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [hatId, setHatId] = useState<HatId>('crown');
+  const [outfitColor, setOutfitColor] = useState<string>('#ec4899');
   const [teamId, setTeamId] = useState<TeamId>('red');
   const [teamMode, setTeamMode] = useState(false);
   const [teamStandings, setTeamStandings] = useState<TeamSummary[]>([]);
@@ -160,6 +162,8 @@ export default function PlayerRoom() {
         if (msg.gameMode) setGameMode(msg.gameMode);
         if (msg.worldTheme) setWorldTheme(msg.worldTheme);
         if (msg.teamId) setTeamId(msg.teamId);
+        if (msg.hatId) setHatId(msg.hatId);
+        if (msg.outfitColor) setOutfitColor(msg.outfitColor);
         if (typeof msg.teamMode === 'boolean') setTeamMode(msg.teamMode);
         if (msg.bombHolderId) setBombHolderId(msg.bombHolderId);
         setPhase('LOBBY');
@@ -169,6 +173,8 @@ export default function PlayerRoom() {
           name: name.trim() || 'Pemain',
           avatar,
           teamId: msg.teamId || teamId,
+          hatId: msg.hatId || hatId,
+          outfitColor: msg.outfitColor || outfitColor,
           x: 0,
           z: msg.gameMode === 'glass_bridge' ? 7.2 : 0,
           jumping: false,
@@ -205,6 +211,8 @@ export default function PlayerRoom() {
                 name: p.name,
                 avatar: p.avatar,
                 teamId: p.teamId ?? existing?.teamId ?? 'red',
+                hatId: p.hatId ?? existing?.hatId ?? 'none',
+                outfitColor: p.outfitColor ?? existing?.outfitColor ?? '#ec4899',
                 x: existing?.x ?? p.x ?? 0,
                 z: existing?.z ?? p.z ?? 0,
                 jumping: existing?.jumping ?? p.jumping ?? false,
@@ -421,7 +429,9 @@ export default function PlayerRoom() {
         code: pin.trim(),
         name: name.trim(),
         avatar,
-        teamId
+        teamId,
+        hatId,
+        outfitColor
       }));
     } else {
       setErrorMsg('Tidak terhubung ke server.');
@@ -429,14 +439,51 @@ export default function PlayerRoom() {
   };
 
   const changePlayerTeam = (newTeam: TeamId) => {
+    const teamHex = TEAM_CONFIGS[newTeam]?.colorHex || outfitColor;
     setTeamId(newTeam);
+    setOutfitColor(teamHex);
     sound.playPop();
-    setArenaPlayers(prev => prev.map(p => p.id === playerId ? { ...p, teamId: newTeam } : p));
+    setArenaPlayers(prev => prev.map(p => p.id === playerId ? { ...p, teamId: newTeam, outfitColor: teamHex } : p));
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
       wsRef.current.send(JSON.stringify({
         type: 'CHANGE_TEAM',
         teamId: newTeam
       }));
+      wsRef.current.send(JSON.stringify({
+        type: 'UPDATE_CUSTOMIZATION',
+        hatId,
+        outfitColor: teamHex,
+        avatar
+      }));
+    }
+  };
+
+  const updateCustomization = (opts: { hatId?: HatId; outfitColor?: string; avatar?: string }) => {
+    const nextHat = opts.hatId ?? hatId;
+    const nextColor = opts.outfitColor ?? outfitColor;
+    const nextAvatar = opts.avatar ?? avatar;
+    if (opts.hatId !== undefined) setHatId(opts.hatId);
+    if (opts.outfitColor !== undefined) setOutfitColor(opts.outfitColor);
+    if (opts.avatar !== undefined) setAvatar(opts.avatar);
+    sound.playPop();
+
+    setArenaPlayers(prev =>
+      prev.map(p =>
+        p.id === playerId
+          ? { ...p, hatId: nextHat, outfitColor: nextColor, avatar: nextAvatar }
+          : p
+      )
+    );
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && roomCode) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'UPDATE_CUSTOMIZATION',
+          hatId: nextHat,
+          outfitColor: nextColor,
+          avatar: nextAvatar,
+        })
+      );
     }
   };
 
@@ -722,6 +769,61 @@ export default function PlayerRoom() {
 
             <div>
               <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                🎩 Pilih Topi & Aksesoris 3D Karakter
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[#0b0f19] p-2.5 rounded-xl border-2 border-black">
+                {HAT_CONFIGS.map((h) => {
+                  const active = hatId === h.id;
+                  return (
+                    <button
+                      type="button"
+                      key={h.id}
+                      onClick={() => {
+                        sound.playPop();
+                        setHatId(h.id);
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 border-2 transition-all cursor-pointer ${
+                        active
+                          ? 'bg-amber-400 text-slate-950 border-black shadow-[2px_2px_0px_#000]'
+                          : 'bg-[#151c2c] text-slate-300 border-transparent hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{h.icon}</span>
+                      <span className="truncate">{h.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
+                👕 Warna Baju 3D Karakter
+              </label>
+              <div className="flex flex-wrap items-center justify-center gap-2 bg-[#0b0f19] p-2.5 rounded-xl border-2 border-black">
+                {OUTFIT_COLORS.map((c) => {
+                  const active = outfitColor.toLowerCase() === c.hex.toLowerCase();
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      onClick={() => {
+                        sound.playPop();
+                        setOutfitColor(c.hex);
+                      }}
+                      title={c.name}
+                      style={{ backgroundColor: c.hex }}
+                      className={`w-8 h-8 rounded-lg border-2 border-black transition-transform cursor-pointer ${
+                        active ? 'ring-2 ring-amber-400 scale-115 shadow-[2px_2px_0px_#000]' : 'opacity-80 hover:opacity-100'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-2">
                 Pilih Skuad Tim (4 Guild)
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -735,6 +837,7 @@ export default function PlayerRoom() {
                       onClick={() => {
                         sound.playPop();
                         setTeamId(tid);
+                        setOutfitColor(cfg.colorHex);
                       }}
                       className={`p-2.5 rounded-xl border-2 border-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         active
@@ -792,31 +895,84 @@ export default function PlayerRoom() {
               {renderPlayerModeSwitcher()}
             </div>
 
-            {/* Guild Team Switcher in Lobby */}
-            <div className="mb-5 bg-[#0b0f19] border-2 border-black rounded-xl p-3">
-              <span className="block text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider mb-2">
-                👥 Pilih Skuad Guild Kamu {teamMode ? '(Mode Battle Tim Aktif!)' : '(Seragam Karakter 3D)'}:
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(['red', 'blue', 'green', 'gold'] as TeamId[]).map((tid) => {
-                  const cfg = TEAM_CONFIGS[tid];
-                  const active = teamId === tid;
-                  return (
-                    <button
-                      key={tid}
-                      type="button"
-                      onClick={() => changePlayerTeam(tid)}
-                      className={`py-2 px-2.5 rounded-lg border-2 border-black text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        active
-                          ? `${cfg.bgClass} ${cfg.textClass} shadow-[2px_2px_0px_#000]`
-                          : 'bg-[#151c2c] text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      <span>{cfg.icon}</span>
-                      <span>{cfg.shortName}</span>
-                    </button>
-                  );
-                })}
+            {/* Guild Team Switcher & 3D Character Customizer in Lobby */}
+            <div className="mb-5 bg-[#0b0f19] border-2 border-black rounded-xl p-3 space-y-3">
+              <div>
+                <span className="block text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  👥 Pilih Skuad Guild Kamu {teamMode ? '(Mode Battle Tim Aktif!)' : '(Seragam Skuad 3D)'}:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['red', 'blue', 'green', 'gold'] as TeamId[]).map((tid) => {
+                    const cfg = TEAM_CONFIGS[tid];
+                    const active = teamId === tid;
+                    return (
+                      <button
+                        key={tid}
+                        type="button"
+                        onClick={() => changePlayerTeam(tid)}
+                        className={`py-2 px-2.5 rounded-lg border-2 border-black text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          active
+                            ? `${cfg.bgClass} ${cfg.textClass} shadow-[2px_2px_0px_#000]`
+                            : 'bg-[#151c2c] text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <span>{cfg.icon}</span>
+                        <span>{cfg.shortName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-2.5 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                <div>
+                  <span className="block text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1.5">
+                    🎩 Topi & Aksesoris 3D:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {HAT_CONFIGS.map((h) => {
+                      const active = hatId === h.id;
+                      return (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => updateCustomization({ hatId: h.id })}
+                          className={`py-1 px-2 rounded-lg text-[11px] font-bold flex items-center gap-1 border-2 transition-all cursor-pointer ${
+                            active
+                              ? 'bg-amber-400 text-slate-950 border-black shadow-[2px_2px_0px_#000]'
+                              : 'bg-[#151c2c] text-slate-300 border-black hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{h.icon}</span>
+                          <span>{h.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="block text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1.5">
+                    👕 Warna Baju 3D Kustom:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {OUTFIT_COLORS.map((c) => {
+                      const active = outfitColor.toLowerCase() === c.hex.toLowerCase();
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => updateCustomization({ outfitColor: c.hex })}
+                          title={c.name}
+                          style={{ backgroundColor: c.hex }}
+                          className={`w-7 h-7 rounded-lg border-2 border-black transition-transform cursor-pointer ${
+                            active ? 'ring-2 ring-amber-400 scale-115 shadow-[2px_2px_0px_#000]' : 'opacity-80 hover:opacity-100'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
 
